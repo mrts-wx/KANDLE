@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#080a11">
+  <meta name="theme-color" content="#090A0C">
   <meta name="description" content="KANDLE — inteligência de mercado, criptoativos e notícias em tempo real.">
   <title>KANDLE — Market Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,16 +17,15 @@
   <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
   <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand" href="#dashboard" aria-label="KANDLE, início">
+      <a class="brand" href="#page-news" data-page-link="news" aria-label="KANDLE, início">
         <span class="brand-mark"><span></span><span></span><span></span></span>
         <span class="brand-copy"><strong>KANDLE<span>_</span></strong><small>MARKET INTELLIGENCE</small></span>
       </a>
       <div class="side-label">WORKSPACE</div>
       <nav class="side-nav" aria-label="Navegação principal">
-        <a class="nav-link active" href="#dashboard"><i data-lucide="layout-dashboard"></i><span>Visão geral</span><span class="nav-indicator"></span></a>
-        <a class="nav-link" href="#markets"><i data-lucide="chart-no-axes-combined"></i><span>Mercados</span></a>
-        <a class="nav-link" href="#news"><i data-lucide="radio-tower"></i><span>Notícias</span><span class="nav-count" id="news-count">—</span></a>
-        <a class="nav-link" href="#watchlist"><i data-lucide="bookmark"></i><span>Watchlist</span></a>
+        <a class="nav-link active" href="#page-news" data-page-link="news" aria-current="page"><i data-lucide="radio-tower"></i><span>Notícias</span><span class="nav-indicator"></span></a>
+        <a class="nav-link" href="#page-markets" data-page-link="markets"><i data-lucide="chart-no-axes-combined"></i><span>Mercados</span></a>
+        <a class="nav-link" href="#page-watchlist" data-page-link="watchlist"><i data-lucide="bookmark"></i><span>Watchlist</span></a>
       </nav>
       <div class="sidebar-spacer"></div>
       <section class="connection-card">
@@ -36,12 +35,12 @@
         <div class="connection-line"><span></span></div>
         <p>Dados públicos de mercado · sem execução de ordens</p>
       </section>
-      <div class="sidebar-footer"><span class="footer-orb"></span><span>BUILT FOR THE CURIOUS</span><span class="version">v1.1</span></div>
+      <div class="sidebar-footer"><span class="footer-orb"></span><span>BUILT FOR THE CURIOUS</span><span class="version">v1.2</span></div>
     </aside>
 
-    <main class="main-content" id="dashboard">
+    <main class="main-content" id="main-content">
       <header class="topbar">
-        <div class="breadcrumb"><span>WORKSPACE</span><i data-lucide="chevron-right"></i><strong>OVERVIEW</strong></div>
+        <div class="breadcrumb"><span>KANDLE</span><i data-lucide="chevron-right"></i><strong id="page-breadcrumb">NOTÍCIAS</strong></div>
         <div class="topbar-actions">
           <div class="market-status"><span class="live-dot"></span><span>CRYPTO MARKETS <b>LIVE</b></span></div>
           <button id="alerts-toggle" class="icon-action alerts-active" type="button" title="Ativar ou pausar alertas de breaking news" aria-pressed="true"><i data-lucide="bell-ring"></i><span class="alert-pip"></span></button>
@@ -49,10 +48,16 @@
           <div class="avatar">K<span></span></div>
         </div>
       </header>
-
-      <div class="ticker-rail" aria-label="Cotações ao vivo"><div class="ticker-label"><span class="pulse-ring"></span> LIVE TICKER</div><div class="ticker-track" id="ticker-track"><div class="ticker-placeholder">Estabelecendo conexão com o mercado…</div></div><div class="ticker-time" id="ticker-time">--:--:--</div></div>
-
-      <section class="welcome-row">
+      <section class="page-view page-view-news is-active" data-page-view="news" id="page-news">
+        <section class="section-block news-section" id="news">
+        <div class="section-heading"><div><div class="eyebrow section-eyebrow"><span class="eyebrow-line"></span> NEWS INTELLIGENCE</div><h2>O que está <span>movendo o mercado</span></h2></div><div class="news-heading-actions"><span class="news-live"><span class="live-dot"></span> AUTO-UPDATE</span><button id="refresh-news" class="icon-action refresh-action" type="button" title="Atualizar notícias"><i data-lucide="refresh-cw"></i></button></div></div>
+        <div class="news-toolbar"><div class="news-filters" id="news-filters"><button class="active" data-news-filter="all" type="button">Todas <span id="all-news-count">—</span></button><button data-news-filter="brasil" type="button">Brasil</button><button data-news-filter="crypto" type="button">Cripto</button><button data-news-filter="global" type="button">Global</button></div><div class="news-updated"><span class="updated-dot"></span><span id="news-updated">Conectando às fontes…</span></div></div>
+        <div class="news-layout"><div class="news-feed" id="news-feed"><div class="news-loading"><span class="loading-spinner"></span><p>Sincronizando manchetes de mercado…</p></div></div><aside class="panel news-side-panel"><div class="news-side-glow"></div><div class="panel-kicker">KANDLE NEWS RADAR</div><div class="radar-art"><div class="radar-sweep"></div><span class="radar-core"></span><span class="radar-cross x"></span><span class="radar-cross y"></span><span class="radar-ring ring-one"></span><span class="radar-ring ring-two"></span><span class="radar-ring ring-three"></span><span class="radar-blip blip-one"></span><span class="radar-blip blip-two"></span><span class="radar-blip blip-three"></span></div><h3>Um olho no agora.<br><span>Outro no próximo movimento.</span></h3><p>O radar monitora manchetes novas e destaca termos associados a eventos relevantes para o mercado.</p><div class="radar-key"><span><i class="key-dot key-red"></i> Alerta urgente</span><span><i class="key-dot key-cyan"></i> Monitoramento ativo</span></div><div class="radar-source-line"><span>FONTES RSS</span><strong id="news-source-status">—</strong></div></aside></div>
+      </section>
+      </section>
+      <section class="page-view page-view-markets" data-page-view="markets" id="page-markets" hidden>
+        <div class="ticker-rail" aria-label="Cotações ao vivo"><div class="ticker-label"><span class="pulse-ring"></span> LIVE TICKER</div><div class="ticker-track" id="ticker-track"><div class="ticker-placeholder">Estabelecendo conexão com o mercado…</div></div><div class="ticker-time" id="ticker-time">--:--:--</div></div>
+        <section class="welcome-row">
         <div>
           <div class="eyebrow"><span class="eyebrow-line"></span> INTELIGÊNCIA DE MERCADO <span class="eyebrow-date" id="today-date">27 OUT 2026</span></div>
           <h1>O mercado não <span class="gradient-text">dorme.</span></h1>
@@ -60,20 +65,17 @@
         </div>
         <div class="session-card"><div class="session-icon"><i data-lucide="activity"></i></div><div><span>SESSÃO</span><strong>24H <em>·</em> 7D</strong><small>Cripto nunca fecha.</small></div><div class="session-arc"><span></span></div></div>
       </section>
-
-      <section class="metrics-grid" aria-label="Indicadores do mercado">
+        <section class="metrics-grid" aria-label="Indicadores do mercado">
         <article class="metric-card metric-featured"><div class="metric-head"><span>BITCOIN / USD</span><span class="metric-symbol btc-symbol">₿</span></div><div class="metric-main"><strong id="metric-btc-price">—</strong><span class="metric-change neutral" id="metric-btc-change">—</span></div><div class="metric-foot"><span>BTCUSDT · SPOT</span><span class="metric-live"><span></span> AO VIVO</span></div><div class="metric-glow"></div></article>
         <article class="metric-card"><div class="metric-head"><span>ETHEREUM / USD</span><span class="metric-symbol eth-symbol">◆</span></div><div class="metric-main"><strong id="metric-eth-price">—</strong><span class="metric-change neutral" id="metric-eth-change">—</span></div><div class="mini-bar eth-bar"><span></span></div><div class="metric-foot"><span>ETHUSDT · SPOT</span><span class="metric-foot-note">24H</span></div></article>
         <article class="metric-card"><div class="metric-head"><span>VOLUME BTC · 24H</span><span class="metric-icon"><i data-lucide="layers-3"></i></span></div><div class="metric-main"><strong id="metric-btc-volume">—</strong><span class="metric-description">USDT negociados</span></div><div class="volume-track"><span id="btc-volume-bar"></span></div><div class="metric-foot"><span>VOLUME DO PAR</span><span class="metric-foot-note">BINANCE</span></div></article>
         <article class="metric-card metric-sentiment"><div class="metric-head"><span>RADAR DE MERCADO</span><span class="metric-icon"><i data-lucide="scan-line"></i></span></div><div class="radar-content"><div class="radar-number" id="radar-number">—<span>/ 8</span></div><div><strong id="radar-label">Aguardando dados</strong><small id="radar-desc">Ativos monitorados em alta</small></div></div><div class="sentiment-track" id="sentiment-track"></div><div class="metric-foot"><span>ATIVOS MONITORADOS</span><span class="metric-foot-note">24H</span></div></article>
       </section>
-
-      <section class="section-block market-section" id="markets">
-        <div class="section-heading"><div><div class="eyebrow section-eyebrow"><span class="eyebrow-line"></span> MONITORAMENTO</div><h2>Mercados <span>em foco</span></h2></div><a class="text-link" href="#watchlist">Ver watchlist <i data-lucide="arrow-up-right"></i></a></div>
+        <section class="section-block market-section" id="markets">
+        <div class="section-heading"><div><div class="eyebrow section-eyebrow"><span class="eyebrow-line"></span> MONITORAMENTO</div><h2>Mercados <span>em foco</span></h2></div><a class="text-link" href="#page-watchlist" data-page-link="watchlist">Ver watchlist <i data-lucide="arrow-up-right"></i></a></div>
         <div class="asset-cards" id="asset-cards"><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
       </section>
-
-      <section class="terminal-grid">
+        <section class="terminal-grid">
         <section class="panel chart-panel" aria-label="Gráfico de candles">
           <div class="panel-heading chart-heading"><div><div class="panel-kicker"><span class="live-dot"></span> TERMINAL GRÁFICO</div><div class="chart-title-row"><span class="coin-avatar btc-symbol" id="chart-coin-symbol">₿</span><div><h2 id="chart-asset-title">Bitcoin <small>BTC / USDT</small></h2><div class="chart-current-row"><strong id="chart-current-price">—</strong><span class="metric-change neutral" id="chart-current-change">—</span></div></div></div></div><div class="chart-controls"><label class="sr-only" for="chart-asset-select">Ativo do gráfico</label><select id="chart-asset-select" class="select-control"><option value="BTCUSDT">BTC / USDT</option><option value="ETHUSDT">ETH / USDT</option><option value="SOLUSDT">SOL / USDT</option><option value="BNBUSDT">BNB / USDT</option><option value="XRPUSDT">XRP / USDT</option><option value="DOGEUSDT">DOGE / USDT</option><option value="ADAUSDT">ADA / USDT</option><option value="AVAXUSDT">AVAX / USDT</option></select><div class="timeframe-group" id="timeframe-group" aria-label="Intervalo do gráfico"><button data-interval="15m" type="button">15m</button><button data-interval="1h" class="active" type="button">1H</button><button data-interval="4h" type="button">4H</button><button data-interval="1d" type="button">1D</button><button data-interval="1w" type="button">1S</button></div></div></div>
           <div class="chart-stats"><div><span>MÁX. 24H</span><strong id="chart-high">—</strong></div><div><span>MÍN. 24H</span><strong id="chart-low">—</strong></div><div><span>VOLUME 24H</span><strong id="chart-volume">—</strong></div><div class="chart-live-label"><span class="live-dot"></span> TEMPO REAL</div></div>
@@ -89,28 +91,35 @@
           <div class="pulse-foot"><i data-lucide="info"></i><span>Indicador ilustrativo baseado nos 8 ativos desta tela; não é recomendação de investimento.</span></div>
         </aside>
       </section>
-
-      <section class="section-block macro-section">
-        <div class="section-heading"><div><div class="eyebrow section-eyebrow"><span class="eyebrow-line"></span> VISÃO GLOBAL</div><h2>Radar <span>macro</span></h2></div><span class="live-chip"><span class="live-dot"></span> COTAÇÕES EXTERNAS</span></div>
-        <div class="panel macro-panel"><div class="macro-copy"><div class="macro-icon"><i data-lucide="globe-2"></i></div><div><strong>Além das criptos.</strong><p>Acompanhe índices globais e câmbio em um painel integrado.</p></div><span class="macro-sources">POWERED BY TRADINGVIEW</span></div><div class="tradingview-widget-container" style="height:360px;width:100%"><div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div><div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Ver gráficos no TradingView</span></a></div><script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>{"colorTheme":"dark","dateRange":"1D","showChart":true,"locale":"br","isTransparent":true,"showSymbolLogo":true,"showFloatingTooltip":true,"width":"100%","height":"360","tabs":[{"title":"Índices","symbols":[{"s":"FOREXCOM:SPXUSD","d":"S&P 500"},{"s":"NASDAQ:NDX","d":"Nasdaq 100"},{"s":"BMFBOVESPA:IBOV","d":"Ibovespa"},{"s":"DJ:DJI","d":"Dow Jones"}]},{"title":"Câmbio","symbols":[{"s":"FX_IDC:USDBRL","d":"USD / BRL"},{"s":"FX_IDC:EURBRL","d":"EUR / BRL"}]}],"support_host":"https://www.tradingview.com"}</script></div></div>
+        <section class="section-block macro-section" id="macro-radar">
+  <div class="section-heading"><div><div class="eyebrow section-eyebrow"><span class="eyebrow-line"></span> VISÃO GLOBAL</div><h2>Radar <span>macro</span></h2></div><span class="live-chip"><span class="live-dot"></span> COTAÇÕES EXTERNAS</span></div>
+  <div class="macro-panel panel">
+    <div class="macro-copy"><div class="macro-icon"><i data-lucide="globe-2"></i></div><div><strong>Além das criptos.</strong><p>Índices globais e Brasil em módulos independentes para evitar falhas em cascata.</p></div><span class="macro-sources">POWERED BY TRADINGVIEW</span></div>
+    <div class="macro-widget-grid">
+      <article class="macro-widget-card"><div class="macro-widget-head"><span><strong>S&P 500</strong><small>SPX · ESTADOS UNIDOS</small></span><a href="https://www.tradingview.com/symbols/FOREXCOM-SPXUSD/" target="_blank" rel="noopener noreferrer" aria-label="Abrir S&P 500 no TradingView"><i data-lucide="arrow-up-right"></i></a></div><div class="tradingview-widget-container" data-tv-symbol="FOREXCOM:SPXUSD"><div class="tradingview-widget-container__widget"><div class="macro-widget-loading">Carregando cotação…</div></div></div></article>
+      <article class="macro-widget-card"><div class="macro-widget-head"><span><strong>Nasdaq 100</strong><small>NDX · TECNOLOGIA</small></span><a href="https://www.tradingview.com/symbols/NASDAQ-NDX/" target="_blank" rel="noopener noreferrer" aria-label="Abrir Nasdaq 100 no TradingView"><i data-lucide="arrow-up-right"></i></a></div><div class="tradingview-widget-container" data-tv-symbol="NASDAQ:NDX"><div class="tradingview-widget-container__widget"><div class="macro-widget-loading">Carregando cotação…</div></div></div></article>
+      <article class="macro-widget-card"><div class="macro-widget-head"><span><strong>Ibovespa</strong><small>IBOV · BRASIL</small></span><a href="https://www.tradingview.com/symbols/BMFBOVESPA-IBOV/" target="_blank" rel="noopener noreferrer" aria-label="Abrir Ibovespa no TradingView"><i data-lucide="arrow-up-right"></i></a></div><div class="tradingview-widget-container" data-tv-symbol="BMFBOVESPA:IBOV"><div class="tradingview-widget-container__widget"><div class="macro-widget-loading">Carregando cotação…</div></div></div></article>
+      <article class="macro-widget-card"><div class="macro-widget-head"><span><strong>Dow Jones</strong><small>DJI · BLUE CHIPS</small></span><a href="https://www.tradingview.com/symbols/DJ-DJI/" target="_blank" rel="noopener noreferrer" aria-label="Abrir Dow Jones no TradingView"><i data-lucide="arrow-up-right"></i></a></div><div class="tradingview-widget-container" data-tv-symbol="DJ:DJI"><div class="tradingview-widget-container__widget"><div class="macro-widget-loading">Carregando cotação…</div></div></div></article>
+    </div>
+    <p class="macro-footnote">As cotações são fornecidas pelo TradingView e podem ter atraso conforme o mercado e a fonte de dados.</p>
+  </div>
+</section>
       </section>
-
-      <section class="section-block news-section" id="news">
-        <div class="section-heading"><div><div class="eyebrow section-eyebrow"><span class="eyebrow-line"></span> NEWS INTELLIGENCE</div><h2>O que está <span>movendo o mercado</span></h2></div><div class="news-heading-actions"><span class="news-live"><span class="live-dot"></span> AUTO-UPDATE</span><button id="refresh-news" class="icon-action refresh-action" type="button" title="Atualizar notícias"><i data-lucide="refresh-cw"></i></button></div></div>
-        <div class="news-toolbar"><div class="news-filters" id="news-filters"><button class="active" data-news-filter="all" type="button">Todas <span id="all-news-count">—</span></button><button data-news-filter="brasil" type="button">Brasil</button><button data-news-filter="crypto" type="button">Cripto</button><button data-news-filter="global" type="button">Global</button></div><div class="news-updated"><span class="updated-dot"></span><span id="news-updated">Conectando às fontes…</span></div></div>
-        <div class="news-layout"><div class="news-feed" id="news-feed"><div class="news-loading"><span class="loading-spinner"></span><p>Sincronizando manchetes de mercado…</p></div></div><aside class="panel news-side-panel"><div class="news-side-glow"></div><div class="panel-kicker">KANDLE NEWS RADAR</div><div class="radar-art"><div class="radar-sweep"></div><span class="radar-core"></span><span class="radar-cross x"></span><span class="radar-cross y"></span><span class="radar-ring ring-one"></span><span class="radar-ring ring-two"></span><span class="radar-ring ring-three"></span><span class="radar-blip blip-one"></span><span class="radar-blip blip-two"></span><span class="radar-blip blip-three"></span></div><h3>Um olho no agora.<br><span>Outro no próximo movimento.</span></h3><p>O radar monitora manchetes novas e destaca termos associados a eventos relevantes para o mercado.</p><div class="radar-key"><span><i class="key-dot key-red"></i> Alerta urgente</span><span><i class="key-dot key-cyan"></i> Monitoramento ativo</span></div><div class="radar-source-line"><span>FONTES RSS</span><strong id="news-source-status">—</strong></div></aside></div>
-      </section>
-
-      <section class="section-block watchlist-section" id="watchlist">
+      <section class="page-view page-view-watchlist" data-page-view="watchlist" id="page-watchlist" hidden>
+        <section class="section-block watchlist-section" id="watchlist">
         <div class="section-heading"><div><div class="eyebrow section-eyebrow"><span class="eyebrow-line"></span> SEU RADAR PESSOAL</div><h2>Ativos <span>monitorados</span></h2></div><div class="table-tools"><label class="search-box"><i data-lucide="search"></i><input type="search" id="asset-search" placeholder="Buscar ativo…" autocomplete="off"></label></div></div>
         <div class="panel asset-table-panel"><div class="table-toolbar"><div class="table-tabs" id="asset-filters"><button class="active" data-asset-filter="all" type="button">Todos os ativos</button><button data-asset-filter="favorites" type="button"><i data-lucide="bookmark"></i> Favoritos <span id="favorites-count">0</span></button><button data-asset-filter="gainers" type="button">Em alta</button></div><span class="table-note"><span class="live-dot"></span> PREÇOS EM TEMPO REAL</span></div><div class="table-scroll"><table class="market-table"><thead><tr><th>ATIVO</th><th>PREÇO (USD)</th><th>VAR. 24H</th><th>MÁX. 24H</th><th>MÍN. 24H</th><th>VOLUME 24H</th><th></th></tr></thead><tbody id="asset-table-body"><tr><td colspan="7" class="table-empty">Aguardando dados da Binance…</td></tr></tbody></table></div><div class="table-foot"><span><i data-lucide="shield-check"></i> Apenas leitura · nenhuma ordem é executada</span><span id="table-updated">—</span></div></div>
       </section>
-
-      <footer class="site-footer"><a class="footer-brand" href="#dashboard"><span class="brand-mark small"><span></span><span></span><span></span></span> KANDLE<span class="footer-underscore">_</span></a><p>Informação em tempo real. Decisões continuam sendo suas.</p><div><span>MARKET INTELLIGENCE</span><span class="footer-separator">/</span><span>DESIGNED TO STAY AHEAD</span></div></footer>
+      </section>
+      <footer class="site-footer"><a class="footer-brand" href="#page-news" data-page-link="news"><span class="brand-mark small"><span></span><span></span><span></span></span> KANDLE<span class="footer-underscore">_</span></a><p>Informação em tempo real. Decisões continuam sendo suas.</p><div><span>MARKET INTELLIGENCE</span><span class="footer-separator">/</span><span>DESIGNED TO STAY AHEAD</span></div></footer>
     </main>
   </div>
 
-  <nav class="mobile-nav" aria-label="Navegação mobile"><a class="active" href="#dashboard"><i data-lucide="layout-dashboard"></i><span>Início</span></a><a href="#markets"><i data-lucide="chart-no-axes-combined"></i><span>Mercado</span></a><a href="#news"><i data-lucide="radio-tower"></i><span>Notícias</span><span class="mobile-news-dot"></span></a><a href="#watchlist"><i data-lucide="bookmark"></i><span>Watchlist</span></a></nav>
+  <nav class="mobile-nav" aria-label="Navegação mobile">
+    <a class="active" href="#page-news" data-page-link="news" aria-current="page"><i data-lucide="radio-tower"></i><span>Notícias</span></a>
+    <a href="#page-markets" data-page-link="markets"><i data-lucide="chart-no-axes-combined"></i><span>Mercados</span></a>
+    <a href="#page-watchlist" data-page-link="watchlist"><i data-lucide="bookmark"></i><span>Watchlist</span></a>
+  </nav>
 
   <div id="breaking-overlay" class="breaking-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="breaking-title"><div class="breaking-scanlines"></div><div class="breaking-flare flare-left"></div><div class="breaking-flare flare-right"></div><div class="breaking-content" id="breaking-content"></div></div>
   <!-- KANDLE AI POPUP START — launch-ready placeholder; keep AI disabled until AI-SETUP.md is completed. -->

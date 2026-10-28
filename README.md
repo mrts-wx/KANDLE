@@ -6,7 +6,7 @@ Dashboard responsivo de mercado com identidade visual neon: cotações cripto, c
 
 - Cotações de BTC, ETH, SOL, BNB, XRP, DOGE, ADA e AVAX via API pública Binance Spot + WebSocket.
 - Candles OHLCV com seleção de ativo e intervalos.
-- Notícias financeiras através de feeds RSS, com filtros temáticos e alerta visual de breaking news.
+- Notícias financeiras consolidadas por uma Cloudflare Pages Function em `/api/news`, com feeds RSS de Google News e agregadores cripto, filtros temáticos e alerta visual de breaking news. A função roda no servidor para evitar bloqueios CORS do navegador e a dependência de um único proxy público.
 - Lista de favoritos salva localmente no navegador.
 - Widgets macro do TradingView.
 - Layout adaptável a desktop, tablet e celular, foco de teclado e suporte à preferência por movimento reduzido.
@@ -25,6 +25,7 @@ Dashboard responsivo de mercado com identidade visual neon: cotações cripto, c
 ├── ai-chat.js                 # cliente de chat para usar só no lançamento
 ├── ai-launch/popup.html       # HTML do popup de chat futuro
 ├── functions/api/ai.js        # endpoint server-side do chat (off por padrão)
+├── functions/api/news.js      # agregador RSS server-side (Cloudflare Pages Function)
 ├── quota-worker/              # Durable Object que aplica limites atômicos
 ├── AI-SETUP.md                # manual completo para ativar, testar e desligar a IA
 └── MONETIZATION.md            # possibilidades de monetização e cuidados
@@ -48,7 +49,8 @@ Para executar Functions localmente, use a ferramenta da Cloudflare (`wrangler`) 
 2. Em Cloudflare, acesse **Workers & Pages → Create → Pages → Connect to Git** e selecione o repositório.
 3. Configure preset **None**, sem build command, saída `.` e raiz contendo `index.html` e a pasta `functions/`.
 4. Conclua o deploy. O site e a área popup de IA funcionam sem nenhuma chave ou binding de IA.
-5. Para ativar o chatbot futuramente, siga **todo** o manual [`AI-SETUP.md`](AI-SETUP.md). Não ative `KANDLE_AI_ENABLED` antes de publicar/configurar o controlador de cotas e o binding AI.
+5. A rota `functions/api/news.js` será publicada como `/api/news` automaticamente, desde que a pasta `functions/` esteja na raiz do site. Não use só `python -m http.server` para validar a rota; esse servidor não executa Functions.
+6. Para ativar o chatbot futuramente, siga **todo** o manual [`AI-SETUP.md`](AI-SETUP.md). Não ative `KANDLE_AI_ENABLED` antes de publicar/configurar o controlador de cotas e o binding AI.
 
 ## Controles e segurança da IA
 
@@ -56,10 +58,17 @@ A IA começa desabilitada: `functions/api/ai.js` retorna `503` quando `KANDLE_AI
 
 A identificação por IP é convertida em hash com salt antes do armazenamento; não é armazenado o IP em texto puro. Até existir autenticação, o limite “por usuário” é, na prática, por endereço de rede, então usuários na mesma rede compartilham cota. Para vender planos, implemente contas/autenticação, quotas por usuário e limites de abuso adicionais.
 
+## Navegação e interface
+
+- A página inicial é Notícias; a barra lateral troca entre Notícias, Mercados e Watchlist sem transformar a tela em uma página de rolagem longa.
+- A camada de breaking news é global, independente da página que estiver aberta.
+- O radar macro usa widgets TradingView isolados por ativo e os carrega só quando a página Mercados fica visível; um widget com falha não deve derrubar os demais. Links diretos para os instrumentos ficam disponíveis em cada card.
+- Favoritos utilizam um único ícone de marcador Lucide com estado acessível e brilho verde; o marcador não troca por ícone de check.
+
 ## Dados, limitações e uso responsável
 
 - Binance: `https://data-api.binance.vision/api/v3` e `wss://data-stream.binance.vision`.
-- Notícias: feeds RSS; fontes e proxies podem falhar, atrasar ou limitar requisições.
+- Notícias: `/api/news` tenta cinco feeds RSS em paralelo, consolida duplicatas e retorna o status de cada fonte. As fontes podem falhar, atrasar ou mudar a estrutura; o frontend mantém uma rota de contingência para preview local.
 - Macro: widgets do TradingView.
 - O dashboard é somente leitura; não envia ordens nem conecta carteiras.
 - Notícias e IA podem conter erros, atrasos ou contexto incompleto. Consulte a fonte original. A KANDLE não garante retornos nem substitui aconselhamento financeiro individual.

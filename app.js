@@ -14,9 +14,9 @@
   ];
   const API = 'https://data-api.binance.vision/api/v3';
   const NEWS_FEEDS = [
-    { key: 'brasil', label: 'BRASIL', url: 'https://news.google.com/rss/search?q=mercado+financeiro+Brasil+OR+Ibovespa+OR+Banco+Central+when:1d&hl=pt-BR&gl=BR&ceid=BR:pt-419' },
-    { key: 'crypto', label: 'CRIPTO', url: 'https://news.google.com/rss/search?q=Bitcoin+OR+Ethereum+OR+criptomoedas+OR+cripto+when:1d&hl=pt-BR&gl=BR&ceid=BR:pt-419' },
-    { key: 'global', label: 'GLOBAL', url: 'https://news.google.com/rss/search?q=Wall+Street+OR+Federal+Reserve+OR+Nasdaq+OR+inflation+markets+when:1d&hl=pt-BR&gl=BR&ceid=BR:pt-419' }
+    { key: 'brasil', label: 'BRASIL', url: 'https://news.google.com/rss/search?q=%28mercado+financeiro+OR+Ibovespa+OR+Selic+OR+Banco+Central%29+when%3A2d&hl=pt-BR&gl=BR&ceid=BR%3Apt-419' },
+    { key: 'crypto', label: 'CRIPTO', url: 'https://news.google.com/rss/search?q=%28Bitcoin+OR+Ethereum+OR+criptomoedas+OR+Binance%29+when%3A2d&hl=pt-BR&gl=BR&ceid=BR%3Apt-419' },
+    { key: 'global', label: 'GLOBAL', url: 'https://news.google.com/rss/search?q=%28Wall+Street+OR+Federal+Reserve+OR+NASDAQ+OR+inflation+OR+tariffs%29+when%3A2d&hl=en-US&gl=US&ceid=US%3Aen' }
   ];
   const HIGH_PRIORITY = /emerg.ncia|breaking|urgente|alerta de mercado|colapso|crash|despenca|desab[aã]|derrete|queda de \d{1,2}%|alta de \d{1,2}%|sobe \d{1,2}%|salta|dispara|surge|plunge|recorde hist.rico|máxima hist.rica|mínima hist.rica|decisão de juros|corta juros|eleva juros|taxa de juros|federal reserve.{0,45}(cut|raise|rate|juros)|banco central.{0,45}(juros|taxa|corte)|infla..o.{0,35}(acima|abaixo|acelera|desacelera|surpreende)|cpi.{0,35}(above|below|surprise)|sec.{0,35}(aprova|rejeita|sues|lawsuit)|aprova..o.{0,35}etf|etf.{0,35}(aprova|approved|inflow|record)|liquida..o|hack|ataque cibern.tico|fal.ncia|default|tarif.{0,35}(anuncia|impo|sobe)|san..es|recess.o/i;
   const state = {
@@ -89,9 +89,9 @@
       state.volumeSeries = state.chart.addSeries(LightweightCharts.HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: '' });
       state.volumeSeries.priceScale().applyOptions({ scaleMargins: { top: .82, bottom: 0 }, visible: false });
       if (!state.chartResizeObserver) {
-        state.chartResizeObserver = new ResizeObserver(entries => { const width = entries[0]?.contentRect.width; if (width && state.chart) state.chart.applyOptions({ width }); if (state.chartLibraryFailed) drawFallbackChart(); });
+        state.chartResizeObserver = new ResizeObserver(entries => { const rect = entries[0]?.contentRect; if (rect?.width && rect?.height && state.chart) state.chart.applyOptions({ width: rect.width, height: rect.height }); if (state.chartLibraryFailed && rect?.width) drawFallbackChart(); });
         state.chartResizeObserver.observe(container);
-        window.addEventListener('resize', () => { if (state.chart) state.chart.applyOptions({ width: container.clientWidth }); if (state.chartLibraryFailed) drawFallbackChart(); });
+        window.addEventListener('resize', () => { if (state.chart && container.clientWidth && container.clientHeight) state.chart.applyOptions({ width: container.clientWidth, height: container.clientHeight }); if (state.chartLibraryFailed) drawFallbackChart(); });
       }
     } catch (error) { console.warn('Chart initialization failed:', error); state.chartLibraryFailed = true; $('#fallback-chart').hidden = false; }
   }
@@ -174,7 +174,7 @@
   function renderMarketCards() {
     const host = $('#asset-cards'); host.innerHTML = ASSETS.slice(0, 4).map(asset => {
       const data = state.prices[asset.symbol] || {}; const favorite = state.watchlist.includes(asset.symbol);
-      return `<article class="asset-card" data-select-asset="${asset.symbol}" tabindex="0" role="button" aria-label="Abrir gráfico de ${asset.name}"><div class="asset-card-top">${avatarHTML(asset)}<div class="asset-name"><strong>${asset.name}</strong><small>${asset.ticker} / USDT</small></div><button class="asset-fav ${favorite ? 'is-favorite' : ''}" data-favorite="${asset.symbol}" type="button" title="${favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}" aria-label="${favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}"> <i data-lucide="bookmark${favorite ? 'Check' : ''}"></i></button></div><div class="asset-price" data-price-for="${asset.symbol}" data-last-value="${data.price || 0}">${formatPrice(data.price)}</div><div class="asset-bottom">${changeHTML(data.change, `data-change-for="${asset.symbol}"`)}<span>24H CHANGE</span></div><div class="asset-card-foot"></div></article>`;
+      return `<article class="asset-card" data-select-asset="${asset.symbol}" tabindex="0" role="button" aria-label="Abrir gráfico de ${asset.name}"><div class="asset-card-top">${avatarHTML(asset)}<div class="asset-name"><strong>${asset.name}</strong><small>${asset.ticker} / USDT</small></div><button class="asset-fav ${favorite ? 'is-favorite' : ''}" data-favorite="${asset.symbol}" type="button" title="${favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}" aria-label="${favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}" aria-pressed="${favorite}"> <i data-lucide="bookmark"></i></button></div><div class="asset-price" data-price-for="${asset.symbol}" data-last-value="${data.price || 0}">${formatPrice(data.price)}</div><div class="asset-bottom">${changeHTML(data.change, `data-change-for="${asset.symbol}"`)}<span>24H CHANGE</span></div><div class="asset-card-foot"></div></article>`;
     }).join('');
     host.querySelectorAll('.asset-card').forEach(card => { card.addEventListener('click', event => { if (event.target.closest('[data-favorite]')) return; selectAsset(card.dataset.selectAsset); $('#markets').scrollIntoView({ behavior: 'smooth', block: 'start' }); }); card.addEventListener('keydown', event => { if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('button')) { event.preventDefault(); selectAsset(card.dataset.selectAsset); } }); });
   }
@@ -205,7 +205,7 @@
     $('#favorites-count').textContent = state.watchlist.length;
     const body = $('#asset-table-body');
     if (!assets.length) { body.innerHTML = `<tr><td colspan="7" class="table-empty">${state.assetFilter === 'favorites' ? 'Nenhum favorito ainda. Use o ícone de marcador em um ativo para adicioná-lo aqui.' : 'Nenhum ativo encontrado para essa busca.'}</td></tr>`; return; }
-    body.innerHTML = assets.map(asset => { const data = state.prices[asset.symbol] || {}; const favorite = state.watchlist.includes(asset.symbol); return `<tr data-select-asset="${asset.symbol}"><td><div class="table-coin">${avatarHTML(asset)}<span><strong>${asset.name}</strong><small>${asset.ticker} / USDT</small></span></div></td><td data-price-for="${asset.symbol}" data-last-value="${data.price || 0}">${formatPrice(data.price)}</td><td class="table-change ${pctClass(data.change)}" data-change-cell="${asset.symbol}">${formatPct(data.change)}</td><td data-high-for="${asset.symbol}">${formatPrice(data.high)}</td><td data-low-for="${asset.symbol}">${formatPrice(data.low)}</td><td data-volume-for="${asset.symbol}">${formatVolume(data.volume)}</td><td><button class="table-fav ${favorite ? 'is-favorite' : ''}" data-favorite="${asset.symbol}" type="button" aria-label="${favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}" title="${favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}"><i data-lucide="bookmark${favorite ? 'Check' : ''}"></i></button></td></tr>`; }).join('');
+    body.innerHTML = assets.map(asset => { const data = state.prices[asset.symbol] || {}; const favorite = state.watchlist.includes(asset.symbol); return `<tr data-select-asset="${asset.symbol}"><td><div class="table-coin">${avatarHTML(asset)}<span><strong>${asset.name}</strong><small>${asset.ticker} / USDT</small></span></div></td><td data-price-for="${asset.symbol}" data-last-value="${data.price || 0}">${formatPrice(data.price)}</td><td class="table-change ${pctClass(data.change)}" data-change-cell="${asset.symbol}">${formatPct(data.change)}</td><td data-high-for="${asset.symbol}">${formatPrice(data.high)}</td><td data-low-for="${asset.symbol}">${formatPrice(data.low)}</td><td data-volume-for="${asset.symbol}">${formatVolume(data.volume)}</td><td><button class="table-fav ${favorite ? 'is-favorite' : ''}" data-favorite="${asset.symbol}" type="button" aria-label="${favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}" aria-pressed="${favorite}" title="${favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}"><i data-lucide="bookmark"></i></button></td></tr>`; }).join('');
     body.querySelectorAll('tr[data-select-asset]').forEach(row => row.addEventListener('click', event => { if (event.target.closest('[data-favorite]')) return; selectAsset(row.dataset.selectAsset); $('#candlestick-chart').scrollIntoView({ behavior: 'smooth', block: 'center' }); }));
     if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
   }
@@ -305,43 +305,84 @@
   }
 
   async function loadNews({ manual = false } = {}) {
-    if (state.newsLoading) return; state.newsLoading = true;
-    const button = $('#refresh-news'); button.classList.add('is-loading'); button.disabled = true;
+    if (state.newsLoading) return;
+    state.newsLoading = true;
+    const button = $('#refresh-news');
+    button.classList.add('is-loading'); button.disabled = true;
     if (manual) $('#news-updated').textContent = 'Atualizando fontes…';
+    let sourceStatuses = [];
     try {
-      const results = await Promise.allSettled(NEWS_FEEDS.map(async feed => {
-        const endpoint = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&count=15`;
-        const json = await fetchJSON(endpoint, 13000); if (json.status !== 'ok' || !Array.isArray(json.items)) throw new Error(`Feed ${feed.key} indisponível`);
-        return json.items.map(item => ({ id: hash(`${item.guid || item.link || ''}|${item.title || ''}`), title: stripHTML(item.title), description: stripHTML(item.description || item.content || ''), url: safeNewsURL(item.link), source: stripHTML(item.author || item.feed?.title || feed.label).slice(0, 70) || feed.label, published: item.pubDate ? new Date(item.pubDate).getTime() : Date.now(), category: feed.key, categoryLabel: feed.label }));
-      }));
-      const fresh = results.filter(result => result.status === 'fulfilled').flatMap(result => result.value);
-      const errors = results.filter(result => result.status === 'rejected').length;
-      const unique = new Map(); [...fresh].sort((a,b)=>b.published-a.published).forEach(item=>{ if(item.title && item.id && !unique.has(item.id)) unique.set(item.id,item); });
-      const normalized = [...unique.values()].slice(0, 45);
-      if (normalized.length) {
-        const currentIds = new Set(normalized.map(item=>item.id));
+      let payload;
+      try {
+        const response = await fetch('/api/news', { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        if (!response.ok) throw new Error(`News endpoint HTTP ${response.status}`);
+        payload = await response.json();
+        sourceStatuses = Array.isArray(payload.sources) ? payload.sources : [];
+        if (!Array.isArray(payload.items)) throw new Error('Formato de notícias inválido');
+      } catch (endpointError) {
+        // Local static preview fallback only. In Cloudflare Pages, /api/news is the preferred same-origin feed proxy.
+        console.warn('KANDLE /api/news unavailable; using local-preview RSS fallback:', endpointError);
+        const results = await Promise.allSettled(NEWS_FEEDS.map(async feed => {
+          const endpoint = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&count=15`;
+          const json = await fetchJSON(endpoint, 11000);
+          if (json.status !== 'ok' || !Array.isArray(json.items)) throw new Error(`Feed ${feed.key} indisponível`);
+          return { key: feed.key, label: feed.label, ok: true, items: json.items.map(item => ({ title: stripHTML(item.title), description: stripHTML(item.description || item.content || ''), url: safeNewsURL(item.link), source: stripHTML(item.author || item.feed?.title || feed.label).slice(0, 70) || feed.label, published: item.pubDate ? new Date(item.pubDate).getTime() : Date.now(), category: feed.key, categoryLabel: feed.label })) };
+        }));
+        payload = { items: results.filter(r => r.status === 'fulfilled').flatMap(r => r.value.items), sources: results.map((r,i) => r.status === 'fulfilled' ? { key: NEWS_FEEDS[i].key, label: NEWS_FEEDS[i].label, ok: true, count: r.value.items.length } : { key: NEWS_FEEDS[i].key, label: NEWS_FEEDS[i].label, ok: false, count: 0 }) };
+        sourceStatuses = payload.sources;
+        if (!payload.items.length) throw endpointError;
+      }
+      const normalized = (payload.items || []).map(item => {
+        const category = ['brasil','crypto','global'].includes(item.category) ? item.category : 'global';
+        const dateValue = item.published ?? item.pubDate ?? item.publishedAt;
+        let published = typeof dateValue === 'number' ? dateValue : new Date(dateValue || Date.now()).getTime();
+        if (!Number.isFinite(published) || published <= 0) published = Date.now();
+        const title = stripHTML(item.title || '');
+        const description = stripHTML(item.description || item.summary || item.content || '');
+        const url = safeNewsURL(item.url || item.link || '');
+        const source = stripHTML(item.source || item.author || item.publisher || category.toUpperCase()).slice(0, 70) || category.toUpperCase();
+        const categoryLabel = item.categoryLabel || (category === 'brasil' ? 'BRASIL' : category === 'crypto' ? 'CRIPTO' : 'GLOBAL');
+        return { id: String(item.id || hash(`${url}|${title}`)), title, description, url, source, published, category, categoryLabel };
+      }).filter(item => item.title && item.url);
+      const unique = new Map();
+      normalized.sort((a,b) => b.published - a.published).forEach(item => {
+        // Remove exact-title duplicates across RSS searches while preserving the newest version.
+        const dedupeKey = item.title.toLocaleLowerCase('pt-BR').replace(/\s+/g, ' ').trim();
+        if (dedupeKey && !unique.has(dedupeKey)) unique.set(dedupeKey, { ...item, id: item.id || hash(dedupeKey) });
+      });
+      const finalItems = [...unique.values()].slice(0, 60);
+      if (finalItems.length) {
         if (state.newsInitialized && state.breakingEnabled) {
           const known = new Set(state.seenNews);
-          const candidates = normalized.filter(item => !known.has(item.id) && isBreaking(item) && Date.now()-item.published < 8*60*60*1000);
+          const candidates = finalItems.filter(item => !known.has(item.id) && isBreaking(item) && Date.now() - item.published < 8 * 60 * 60 * 1000);
           candidates.slice(0, 2).forEach(item => state.breakingQueue.push(item));
         }
-        state.news = normalized; state.newsInitialized = true;
-        state.seenNews = [...new Set([...normalized.map(item=>item.id), ...state.seenNews])].slice(0, 240); writeJSON('kandle-seen-news', state.seenNews);
-        renderNews(); $('#news-source-status').textContent = errors ? `${NEWS_FEEDS.length-errors}/${NEWS_FEEDS.length} CONECTADAS` : `${NEWS_FEEDS.length} CONECTADAS`;
+        state.news = finalItems;
+        state.newsInitialized = true;
+        state.seenNews = [...new Set([...finalItems.map(item => item.id), ...state.seenNews])].slice(0, 300);
+        writeJSON('kandle-seen-news', state.seenNews);
+        renderNews();
+        const goodSources = sourceStatuses.filter(source => source.ok).length;
+        const sourceCount = sourceStatuses.length || NEWS_FEEDS.length;
+        $('#news-source-status').textContent = goodSources ? `${goodSources}/${sourceCount} FONTES OK` : 'FONTE PARCIAL';
         $('#news-updated').textContent = `Atualizado às ${new Date().toLocaleTimeString('pt-BR')}`;
-        if (errors === NEWS_FEEDS.length) $('#news-source-status').textContent = 'FONTES INDISPONÍVEIS';
+        if (goodSources === 0) $('#news-source-status').textContent = 'FONTE PARCIAL';
         if (state.breakingQueue.length && !state.breakingActive) showNextBreaking();
-      } else if (!state.news.length) {
-        $('#news-feed').innerHTML = `<div class="news-empty news-error"><strong>Não foi possível sincronizar as manchetes.</strong>As fontes RSS podem estar limitadas no momento. Tente atualizar novamente em alguns instantes.</div>`;
-        $('#news-source-status').textContent = 'TENTANDO NOVAMENTE'; $('#news-updated').textContent = 'Falha na sincronização';
+        if (manual) toast('Feed atualizado', `${finalItems.length} manchetes consolidadas.`);
+      } else {
+        throw new Error('As fontes não retornaram manchetes válidas.');
       }
-      if (manual && normalized.length) toast('Feed atualizado', `${normalized.length} manchetes consolidadas.`);
     } catch (error) {
-      console.warn('News fetch failed:', error);
-      if (!state.news.length) $('#news-feed').innerHTML = `<div class="news-empty news-error"><strong>O radar está temporariamente sem feed.</strong>Preços e candles continuam funcionando à parte. Tente novamente em instantes.</div>`;
-      $('#news-source-status').textContent = 'RECONEXÃO'; $('#news-updated').textContent = 'Feed indisponível';
-      if (manual) toast('Falha ao atualizar as notícias', 'As fontes RSS podem estar indisponíveis temporariamente.', true);
-    } finally { state.newsLoading = false; button.classList.remove('is-loading'); button.disabled = false; }
+      console.warn('KANDLE news sync failed:', error);
+      if (!state.news.length) {
+        $('#news-feed').innerHTML = `<div class="news-empty news-error"><strong>As manchetes não estão disponíveis neste momento.</strong><span>O terminal tentou o agregador de notícias e a rota de contingência. Confira se a pasta <code>functions/api/news.js</code> foi publicada com o site e tente atualizar novamente.</span></div>`;
+      }
+      $('#news-source-status').textContent = 'TENTANDO NOVAMENTE';
+      $('#news-updated').textContent = 'Falha na sincronização';
+      if (manual) toast('Falha ao atualizar as notícias', 'A rota de notícias ou os feeds externos estão indisponíveis.', true);
+    } finally {
+      state.newsLoading = false; button.classList.remove('is-loading'); button.disabled = false;
+    }
   }
   function safeNewsURL(value) { try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } }
   function hash(value) { let h = 2166136261; for (let i=0; i<value.length; i++) { h ^= value.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); }
@@ -355,7 +396,8 @@
   }
   function renderNews() {
     const filter = state.newsFilter; const filtered = state.news.filter(item => filter === 'all' || item.category === filter);
-    $('#news-count').textContent = state.news.length || '—'; $('#all-news-count').textContent = state.news.length;
+    const navNewsCount = $('#news-count'); if (navNewsCount) navNewsCount.textContent = state.news.length || '—';
+    $('#all-news-count').textContent = state.news.length;
     if (!filtered.length) { $('#news-feed').innerHTML = `<div class="news-empty"><strong>Sem manchetes para este filtro.</strong>Troque a categoria ou atualize as fontes de notícias.</div>`; return; }
     $('#news-feed').innerHTML = filtered.slice(0, 24).map(item => {
       const breaking = isBreaking(item); const time = formatNewsTime(item.published); const description = item.description.length > 240 ? item.description.slice(0, 237) + '…' : item.description;
@@ -397,6 +439,61 @@
     if (!enabled) { state.breakingQueue = []; if (state.breakingActive && !$('#breaking-overlay').dataset.demo) closeBreaking(); }
     toast(enabled ? 'Alertas ativados' : 'Alertas pausados', enabled ? 'Novas manchetes relevantes poderão abrir o modo breaking news.' : 'O feed continua atualizando sem abrir a animação de tela cheia.');
   }
+  function initializeMacroWidgets() {
+    $$('.macro-widget-card .tradingview-widget-container[data-tv-symbol]').forEach(container => {
+      if (container.dataset.tvInitialized === 'true') return;
+      const host = container.querySelector('.tradingview-widget-container__widget');
+      if (!host || !container.dataset.tvSymbol) return;
+      container.dataset.tvInitialized = 'true';
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.async = true;
+      script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+      script.textContent = JSON.stringify({
+        symbol: container.dataset.tvSymbol,
+        width: '100%',
+        height: '100%',
+        locale: 'br',
+        dateRange: '1D',
+        colorTheme: 'dark',
+        isTransparent: true,
+        autosize: true,
+        largeChartUrl: ''
+      });
+      container.appendChild(script);
+    });
+  }
+  function pageFromHash() {
+    const hash = (location.hash || '').replace(/^#/, '');
+    if (hash === 'page-markets' || hash === 'markets' || hash === 'macro-radar') return 'markets';
+    if (hash === 'page-watchlist' || hash === 'watchlist') return 'watchlist';
+    return 'news';
+  }
+  function navigatePage(page, { scroll = true } = {}) {
+    const validPages = ['news', 'markets', 'watchlist'];
+    if (!validPages.includes(page)) page = 'news';
+    $$('.page-view').forEach(view => {
+      const active = view.dataset.pageView === page;
+      view.hidden = !active;
+      view.classList.toggle('is-active', active);
+    });
+    $$('[data-page-link]').forEach(link => {
+      const active = link.dataset.pageLink === page;
+      link.classList.toggle('active', active);
+      if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+    });
+    const labels = { news: 'NOTÍCIAS', markets: 'MERCADOS', watchlist: 'WATCHLIST' };
+    const breadcrumb = $('#page-breadcrumb');
+    if (breadcrumb) breadcrumb.textContent = labels[page];
+    document.body.dataset.currentPage = page;
+    if (scroll) window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (page === 'markets') requestAnimationFrame(() => {
+      initializeMacroWidgets();
+      const container = $('#candlestick-chart');
+      if (state.chart && container?.clientWidth && container?.clientHeight) state.chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+      if (state.chartLibraryFailed) drawFallbackChart();
+    });
+  }
   function initEvents() {
     $('#chart-asset-select').addEventListener('change', event => { state.selectedSymbol = event.target.value; updateChartHeader(); loadCandles(); });
     $('#timeframe-group').addEventListener('click', event => { const button = event.target.closest('button[data-interval]'); if (!button) return; state.interval = button.dataset.interval; $$('#timeframe-group button').forEach(btn => btn.classList.toggle('active', btn === button)); loadCandles(); });
@@ -407,13 +504,21 @@
     $('#refresh-news').addEventListener('click', () => loadNews({ manual: true }));
     $('#alerts-toggle').addEventListener('click', () => setBreakingEnabled(!state.breakingEnabled));
     $('#test-alert').addEventListener('click', () => showBreaking({ demo: true, title: 'Este é um teste do sistema de Breaking News', description: 'Quando uma manchete nova e potencialmente relevante for detectada nas fontes de notícias, o KANDLE abre esta animação em tela cheia e apresenta a manchete e seu resumo. O feed continua sendo atualizado automaticamente em segundo plano.', source: 'KANDLE TERMINAL', url: '' }));
-    $$('.nav-link, .mobile-nav a').forEach(link => link.addEventListener('click', () => { const target = link.getAttribute('href'); $$('.nav-link').forEach(item=>item.classList.toggle('active',item===link)); $$('.mobile-nav a').forEach(item=>item.classList.toggle('active',item===link)); if (target === '#news') $('#news').scrollIntoView({ behavior: 'smooth' }); }));
+    $$('[data-page-link]').forEach(link => link.addEventListener('click', event => {
+      event.preventDefault();
+      const page = link.dataset.pageLink;
+      navigatePage(page);
+      if (location.hash !== `#page-${page}`) history.pushState({ page }, '', `#page-${page}`);
+    }));
+    window.addEventListener('popstate', () => navigatePage(pageFromHash(), { scroll: true }));
+    window.addEventListener('hashchange', () => navigatePage(pageFromHash(), { scroll: true }));
     $('#breaking-overlay').addEventListener('click', event => { if (event.target.id === 'breaking-overlay' && $('#breaking-overlay').dataset.demo === 'true') closeBreaking(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && state.breakingActive) closeBreaking(); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (!state.tickerSocket || state.tickerSocket.readyState > 1) connectTickerSocket(); } });
   }
   function initLucide() { if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } }); }
   async function boot() {
+    navigatePage(pageFromHash(), { scroll: false });
     initDateClock(); initLucide(); initEvents();
     if (!state.breakingEnabled) setBreakingEnabled(false); else { const btn = $('#alerts-toggle'); btn.classList.add('alerts-active'); btn.setAttribute('aria-pressed','true'); }
     initChart();
