@@ -187,16 +187,19 @@
     }
     if (persist) writeJSON('kandle-theme', state.theme);
     applyChartTheme();
-    // TradingView embeds inherit their theme only at initialization. Reload them after a theme change.
+    // TradingView iframe widgets don't reliably repaint when the site theme changes.
+    // Tear down the old iframe/script and rebuild with explicit foreground + background colors.
     $$('.macro-widget-card .tradingview-widget-container').forEach(container => {
-      if (container.dataset.tvInitialized === 'true') {
-        container.dataset.tvInitialized = 'false';
-        const host = container.querySelector('.tradingview-widget-container__widget');
-        if (host) host.innerHTML = '<div class="macro-widget-loading">Atualizando tema do gráfico…</div>';
-        container.querySelectorAll('script').forEach(script => script.remove());
+      container.dataset.tvInitialized = 'false';
+      container.dataset.tvGeneration = String((Number(container.dataset.tvGeneration) || 0) + 1);
+      const host = container.querySelector('.tradingview-widget-container__widget');
+      if (host) {
+        host.innerHTML = '<div class="macro-widget-loading">Atualizando tema do gráfico…</div>';
+        delete host.dataset.fallbackShown;
       }
+      container.querySelectorAll('script').forEach(script => script.remove());
     });
-    if (document.body.dataset.currentPage === 'markets') window.setTimeout(initializeMacroWidgets, 100);
+    if (document.body.dataset.currentPage === 'markets') window.setTimeout(initializeMacroWidgets, 80);
   }
   function initChart() {
     const container = $('#candlestick-chart');
@@ -670,30 +673,49 @@
     if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
   }
   function initializeMacroWidgets() {
+    const isLight = document.documentElement.dataset.theme === 'light';
+    const widgetTheme = isLight ? 'light' : 'dark';
+    const widgetBackground = isLight ? '#FFFFFF' : '#20242B';
+    const widgetText = isLight ? '#17202D' : '#F2F5FD';
+    const widgetMuted = isLight ? '#566171' : '#AEB8C8';
+    const accent = isLight ? '#00788B' : '#55F3FF';
     $$('.macro-widget-card .tradingview-widget-container[data-tv-symbol]').forEach(container => {
       if (container.dataset.tvInitialized === 'true') return;
       const host = container.querySelector('.tradingview-widget-container__widget');
       if (!host || !container.dataset.tvSymbol) return;
       container.dataset.tvInitialized = 'true';
+      const generation = Number(container.dataset.tvGeneration) || 0;
+      const expectedTheme = widgetTheme;
       const script = document.createElement('script');
       script.type = 'text/javascript';
       script.async = true;
       script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
-      script.textContent = JSON.stringify({
+      // The embed is cross-origin, so its colors must be passed in the widget config.
+      // A CSS background alone cannot recolor the iframe contents.
+      script.innerHTML = JSON.stringify({
         symbol: container.dataset.tvSymbol,
         width: '100%',
         height: '100%',
         locale: 'br',
         dateRange: '1D',
-        colorTheme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
-        isTransparent: true,
+        colorTheme: widgetTheme,
+        backgroundColor: widgetBackground,
+        widgetFontColor: widgetText,
+        fontColor: widgetMuted,
+        trendLineColor: accent,
+        underLineColor: accent,
+        underLineBottomColor: isLight ? 'rgba(0,120,139,0)' : 'rgba(85,243,255,0)',
+        isTransparent: false,
         autosize: true,
         largeChartUrl: ''
       });
-      script.onerror = () => showMacroFallback(container);
+      script.onerror = () => {
+        if (Number(container.dataset.tvGeneration || 0) === generation && document.documentElement.dataset.theme === expectedTheme) showMacroFallback(container);
+      };
       container.appendChild(script);
-      // Do not leave an empty loading skeleton indefinitely if an embed is blocked upstream.
+      // Avoid a stale timeout replacing a newer widget after the user switches themes quickly.
       window.setTimeout(() => {
+        if (Number(container.dataset.tvGeneration || 0) !== generation || document.documentElement.dataset.theme !== expectedTheme) return;
         if (!container.querySelector('iframe') && !container.querySelector('.macro-widget-fallback')) {
           showMacroFallback(container, 'O widget demorou a carregar ou o provedor não permite este símbolo incorporado.');
         }

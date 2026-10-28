@@ -106,3 +106,13 @@ Cotações, feeds e widgets dependem de serviços externos e podem sofrer indisp
 - Respeito a `prefers-reduced-motion`. O KANDLE Breaking Sound, o Worker e os arquivos de deploy foram mantidos.
 
 O deploy continua seguindo `wrangler.jsonc`: os arquivos estáticos devem ser servidos exclusivamente pela pasta `public/`.
+
+
+## KANDLE v1.5.1 — correção do tema dos widgets macro
+
+- Widgets incorporados do TradingView agora recebem `colorTheme`, `backgroundColor`, `widgetFontColor` e cores de linha explícitos para os temas claro e cinza-chumbo.
+- A troca de tema descarta o iframe antigo, limpa o estado de fallback e recria os widgets com a configuração correspondente.
+- Timers de widgets antigos são ignorados após a troca de tema, evitando que um carregamento atrasado substitua o gráfico novo.
+- O fundo do contêiner de cada widget acompanha o tema para não mostrar um bloco branco durante o carregamento.
+
+Para atualizar, substitua os arquivos de `public/` deste pacote na raiz do seu repositório e publique normalmente com o `wrangler.jsonc` já existente.

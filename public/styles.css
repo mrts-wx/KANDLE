@@ -522,3 +522,13 @@ body::before { display:none; }
 :root[data-theme="light"] .coin-avatar.avax { color:#B21E46; background:#FBE7ED; }
 :root[data-theme="light"] .toast span { color:#B4C0D1; }
 .metric-glow,.news-side-glow { filter:none; opacity:.25; }
+
+
+/* KANDLE v1.5.1 — explicit surfaces behind TradingView's cross-origin iframes.
+   The embedded widget itself receives matching theme/background colors from app.js. */
+:root[data-theme="dark"] .macro-widget-card .tradingview-widget-container,
+:root[data-theme="dark"] .macro-widget-card .tradingview-widget-container__widget { background:#20242B; color:#F2F5FD; color-scheme:dark; }
+:root[data-theme="light"] .macro-widget-card .tradingview-widget-container,
+:root[data-theme="light"] .macro-widget-card .tradingview-widget-container__widget { background:#FFFFFF; color:#17202D; color-scheme:light; }
+.macro-widget-card .tradingview-widget-container__widget { border-radius:8px; overflow:hidden; }
+.macro-widget-card .tradingview-widget-container iframe { display:block; border:0!important; background:transparent; }
