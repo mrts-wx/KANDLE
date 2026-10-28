@@ -23,7 +23,7 @@
     prices: {}, selectedSymbol: 'BTCUSDT', interval: '1h', chart: null, candleSeries: null, volumeSeries: null,
     candles: [], socket: null, tickerSocket: null, tickerRetry: null, klineRetry: null,
     chartRequestId: 0, chartRetry: null, watchlist: readJSON('kandle-watchlist', ['BTCUSDT', 'ETHUSDT']),
-    assetFilter: 'all', assetSearch: '', news: [], newsFilter: 'all', newsInitialized: false,
+    assetFilter: 'all', assetSearch: '', news: [], newsFilter: 'all', newsInitialized: false, newsSources: [],
     newsLoading: false, breakingEnabled: readJSON('kandle-breaking-enabled', true),
     seenNews: readJSON('kandle-seen-news', []), breakingQueue: [], breakingActive: false, breakingTimers: [], chartResizeObserver: null,
     refreshTimer: null, firstPriceLoad: false, chartLibraryFailed: typeof window.LightweightCharts === 'undefined'
@@ -311,29 +311,54 @@
     button.classList.add('is-loading'); button.disabled = true;
     if (manual) $('#news-updated').textContent = 'Atualizando fontes…';
     let sourceStatuses = [];
+    let payload = null;
     try {
-      let payload;
+      // Primary path: same-origin Cloudflare Worker/Pages Function.
       try {
-        const response = await fetch('/api/news', { cache: 'no-store', headers: { 'Accept': 'application/json' } });
-        if (!response.ok) throw new Error(`News endpoint HTTP ${response.status}`);
-        payload = await response.json();
-        sourceStatuses = Array.isArray(payload.sources) ? payload.sources : [];
-        if (!Array.isArray(payload.items)) throw new Error('Formato de notícias inválido');
+        const response = await fetch(`/api/news${manual ? `?refresh=1&t=${Date.now()}` : ''}`, {
+          cache: 'no-store', headers: { 'Accept': 'application/json' }
+        });
+        const body = await response.json();
+        if (!response.ok && !Array.isArray(body.items)) throw new Error(`News endpoint HTTP ${response.status}`);
+        payload = body;
+        sourceStatuses = Array.isArray(body.sources) ? body.sources : [];
       } catch (endpointError) {
-        // Local static preview fallback only. In Cloudflare Pages, /api/news is the preferred same-origin feed proxy.
-        console.warn('KANDLE /api/news unavailable; using local-preview RSS fallback:', endpointError);
-        const results = await Promise.allSettled(NEWS_FEEDS.map(async feed => {
-          const endpoint = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&count=15`;
-          const json = await fetchJSON(endpoint, 11000);
-          if (json.status !== 'ok' || !Array.isArray(json.items)) throw new Error(`Feed ${feed.key} indisponível`);
-          return { key: feed.key, label: feed.label, ok: true, items: json.items.map(item => ({ title: stripHTML(item.title), description: stripHTML(item.description || item.content || ''), url: safeNewsURL(item.link), source: stripHTML(item.author || item.feed?.title || feed.label).slice(0, 70) || feed.label, published: item.pubDate ? new Date(item.pubDate).getTime() : Date.now(), category: feed.key, categoryLabel: feed.label })) };
-        }));
-        payload = { items: results.filter(r => r.status === 'fulfilled').flatMap(r => r.value.items), sources: results.map((r,i) => r.status === 'fulfilled' ? { key: NEWS_FEEDS[i].key, label: NEWS_FEEDS[i].label, ok: true, count: r.value.items.length } : { key: NEWS_FEEDS[i].key, label: NEWS_FEEDS[i].label, ok: false, count: 0 }) };
-        sourceStatuses = payload.sources;
-        if (!payload.items.length) throw endpointError;
+        console.warn('KANDLE /api/news indisponível; tentando agregador alternativo:', endpointError);
       }
-      const normalized = (payload.items || []).map(item => {
-        const category = ['brasil','crypto','global'].includes(item.category) ? item.category : 'global';
+
+      // If the server route itself is missing or all upstream feeds failed, try a public RSS-to-JSON relay.
+      if (!payload || !Array.isArray(payload.items) || payload.items.length === 0) {
+        const results = await Promise.allSettled(NEWS_FEEDS.map(async feed => {
+          const endpoint = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&count=20`;
+          const json = await fetchJSON(endpoint, 10000);
+          if (json.status !== 'ok' || !Array.isArray(json.items) || !json.items.length) throw new Error(`Sem itens de ${feed.label}`);
+          return {
+            key: feed.key, label: feed.label, ok: true, via: 'rss2json', count: json.items.length,
+            items: json.items.map(item => ({
+              id: hash(`${item.link || ''}|${item.title || ''}`),
+              title: stripHTML(item.title || ''), description: stripHTML(item.description || item.content || ''),
+              url: safeNewsURL(item.link), source: stripHTML(item.author || item.feed?.title || feed.label).slice(0, 70) || feed.label,
+              published: item.pubDate ? new Date(item.pubDate).getTime() : Date.now(), category: feed.key,
+              categoryLabel: feed.label
+            }))
+          };
+        }));
+        const fallbackItems = results.filter(result => result.status === 'fulfilled').flatMap(result => result.value.items);
+        const fallbackSources = results.map((result, index) => result.status === 'fulfilled'
+          ? { key: NEWS_FEEDS[index].key, label: NEWS_FEEDS[index].label, ok: true, via: 'rss2json', count: result.value.items.length }
+          : { key: NEWS_FEEDS[index].key, label: NEWS_FEEDS[index].label, ok: false, via: 'rss2json', count: 0, error: String(result.reason?.message || 'Falha no agregador').slice(0, 100) });
+        if (fallbackItems.length) {
+          payload = { items: fallbackItems, sources: fallbackSources, updatedAt: Date.now(), partial: fallbackSources.some(source => !source.ok) };
+          sourceStatuses = fallbackSources;
+        } else if (!payload || !Array.isArray(payload.items) || payload.items.length === 0) {
+          payload = { items: [], sources: fallbackSources, error: 'As fontes não responderam.' };
+          sourceStatuses = fallbackSources;
+        }
+      }
+
+      sourceStatuses = Array.isArray(payload?.sources) && payload.sources.length ? payload.sources : sourceStatuses;
+      const normalized = (payload?.items || []).map(item => {
+        const category = ['brasil', 'crypto', 'global'].includes(item.category) ? item.category : 'global';
         const dateValue = item.published ?? item.pubDate ?? item.publishedAt;
         let published = typeof dateValue === 'number' ? dateValue : new Date(dateValue || Date.now()).getTime();
         if (!Number.isFinite(published) || published <= 0) published = Date.now();
@@ -345,12 +370,12 @@
         return { id: String(item.id || hash(`${url}|${title}`)), title, description, url, source, published, category, categoryLabel };
       }).filter(item => item.title && item.url);
       const unique = new Map();
-      normalized.sort((a,b) => b.published - a.published).forEach(item => {
-        // Remove exact-title duplicates across RSS searches while preserving the newest version.
+      normalized.sort((a, b) => b.published - a.published).forEach(item => {
         const dedupeKey = item.title.toLocaleLowerCase('pt-BR').replace(/\s+/g, ' ').trim();
         if (dedupeKey && !unique.has(dedupeKey)) unique.set(dedupeKey, { ...item, id: item.id || hash(dedupeKey) });
       });
       const finalItems = [...unique.values()].slice(0, 60);
+      state.newsSources = sourceStatuses;
       if (finalItems.length) {
         if (state.newsInitialized && state.breakingEnabled) {
           const known = new Set(state.seenNews);
@@ -364,25 +389,35 @@
         renderNews();
         const goodSources = sourceStatuses.filter(source => source.ok).length;
         const sourceCount = sourceStatuses.length || NEWS_FEEDS.length;
-        $('#news-source-status').textContent = goodSources ? `${goodSources}/${sourceCount} FONTES OK` : 'FONTE PARCIAL';
+        $('#news-source-status').textContent = `${goodSources}/${sourceCount} FONTES OK`;
         $('#news-updated').textContent = `Atualizado às ${new Date().toLocaleTimeString('pt-BR')}`;
-        if (goodSources === 0) $('#news-source-status').textContent = 'FONTE PARCIAL';
         if (state.breakingQueue.length && !state.breakingActive) showNextBreaking();
         if (manual) toast('Feed atualizado', `${finalItems.length} manchetes consolidadas.`);
       } else {
-        throw new Error('As fontes não retornaram manchetes válidas.');
+        state.news = [];
+        state.newsInitialized = true;
+        renderNews();
+        const goodSources = sourceStatuses.filter(source => source.ok).length;
+        $('#news-source-status').textContent = `${goodSources}/${sourceStatuses.length || NEWS_FEEDS.length} FONTES OK`;
+        $('#news-updated').textContent = 'Sem manchetes · nova tentativa automática';
+        if (manual) toast('Ainda sem manchetes', 'O servidor respondeu, mas as fontes RSS não entregaram itens. Veja o diagnóstico no painel.', true);
       }
     } catch (error) {
       console.warn('KANDLE news sync failed:', error);
+      state.newsSources = sourceStatuses;
       if (!state.news.length) {
-        $('#news-feed').innerHTML = `<div class="news-empty news-error"><strong>As manchetes não estão disponíveis neste momento.</strong><span>O terminal tentou o agregador de notícias e a rota de contingência. Confira se a pasta <code>functions/api/news.js</code> foi publicada com o site e tente atualizar novamente.</span></div>`;
+        $('#news-feed').innerHTML = `<div class="news-empty news-error"><strong>O radar ainda não conseguiu receber manchetes.</strong><span>A KANDLE tentou a rota do servidor e o agregador alternativo. Confira o diagnóstico das fontes abaixo ou tente novamente em instantes.</span>${renderSourceDiagnostics(sourceStatuses)}</div>`;
       }
       $('#news-source-status').textContent = 'TENTANDO NOVAMENTE';
       $('#news-updated').textContent = 'Falha na sincronização';
-      if (manual) toast('Falha ao atualizar as notícias', 'A rota de notícias ou os feeds externos estão indisponíveis.', true);
+      if (manual) toast('Falha ao atualizar as notícias', 'Confira se /api/news está publicado no Cloudflare.', true);
     } finally {
       state.newsLoading = false; button.classList.remove('is-loading'); button.disabled = false;
     }
+  }
+  function renderSourceDiagnostics(sources = []) {
+    if (!sources.length) return '<div class="source-diagnostics">Nenhum diagnóstico retornado pelo servidor.</div>';
+    return `<div class="source-diagnostics">${sources.map(source => `<span class="source-diagnostic ${source.ok ? 'is-ok' : 'is-failed'}"><i></i><b>${escapeHTML(source.label || source.key || 'Fonte')}</b><small>${source.ok ? `${Number(source.count) || 0} itens` : escapeHTML(source.error || 'indisponível')}</small></span>`).join('')}</div>`;
   }
   function safeNewsURL(value) { try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } }
   function hash(value) { let h = 2166136261; for (let i=0; i<value.length; i++) { h ^= value.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); }
@@ -398,7 +433,12 @@
     const filter = state.newsFilter; const filtered = state.news.filter(item => filter === 'all' || item.category === filter);
     const navNewsCount = $('#news-count'); if (navNewsCount) navNewsCount.textContent = state.news.length || '—';
     $('#all-news-count').textContent = state.news.length;
-    if (!filtered.length) { $('#news-feed').innerHTML = `<div class="news-empty"><strong>Sem manchetes para este filtro.</strong>Troque a categoria ou atualize as fontes de notícias.</div>`; return; }
+    if (!filtered.length) {
+      const empty = state.news.length
+        ? `<div class="news-empty"><strong>Sem manchetes para este filtro.</strong>Troque a categoria ou atualize as fontes de notícias.</div>`
+        : `<div class="news-empty news-error"><strong>O radar ainda não recebeu manchetes.</strong><span>As cotações continuam funcionando; as notícias dependem das fontes externas. Use atualizar para tentar de novo.</span>${renderSourceDiagnostics(state.newsSources)}</div>`;
+      $('#news-feed').innerHTML = empty; return;
+    }
     $('#news-feed').innerHTML = filtered.slice(0, 24).map(item => {
       const breaking = isBreaking(item); const time = formatNewsTime(item.published); const description = item.description.length > 240 ? item.description.slice(0, 237) + '…' : item.description;
       const tagClass = item.category === 'brasil' ? 'tag-brasil' : item.category === 'global' ? 'tag-global' : '';
@@ -439,6 +479,14 @@
     if (!enabled) { state.breakingQueue = []; if (state.breakingActive && !$('#breaking-overlay').dataset.demo) closeBreaking(); }
     toast(enabled ? 'Alertas ativados' : 'Alertas pausados', enabled ? 'Novas manchetes relevantes poderão abrir o modo breaking news.' : 'O feed continua atualizando sem abrir a animação de tela cheia.');
   }
+  function showMacroFallback(container, message = 'Abra este instrumento diretamente no TradingView.') {
+    const host = container.querySelector('.tradingview-widget-container__widget');
+    const link = container.closest('.macro-widget-card')?.querySelector('.macro-widget-head a');
+    if (!host || host.dataset.fallbackShown === 'true') return;
+    host.dataset.fallbackShown = 'true';
+    host.innerHTML = `<div class="macro-widget-fallback"><i data-lucide="external-link"></i><strong>Visualização incorporada indisponível</strong><span>${escapeHTML(message)}</span>${link ? `<a href="${escapeHTML(link.href)}" target="_blank" rel="noopener noreferrer">Abrir no TradingView <i data-lucide="arrow-up-right"></i></a>` : ''}</div>`;
+    if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+  }
   function initializeMacroWidgets() {
     $$('.macro-widget-card .tradingview-widget-container[data-tv-symbol]').forEach(container => {
       if (container.dataset.tvInitialized === 'true') return;
@@ -460,7 +508,14 @@
         autosize: true,
         largeChartUrl: ''
       });
+      script.onerror = () => showMacroFallback(container);
       container.appendChild(script);
+      // Do not leave an empty loading skeleton indefinitely if an embed is blocked upstream.
+      window.setTimeout(() => {
+        if (!container.querySelector('iframe') && !container.querySelector('.macro-widget-fallback')) {
+          showMacroFallback(container, 'O widget demorou a carregar ou o provedor não permite este símbolo incorporado.');
+        }
+      }, 12000);
     });
   }
   function pageFromHash() {
@@ -518,7 +573,9 @@
   }
   function initLucide() { if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } }); }
   async function boot() {
-    navigatePage(pageFromHash(), { scroll: false });
+    // KANDLE always opens on News, even if an old session left another page in the URL hash.
+    navigatePage('news', { scroll: false });
+    if (location.hash && location.hash !== '#page-news') history.replaceState({ page: 'news' }, '', `${location.pathname}${location.search}#page-news`);
     initDateClock(); initLucide(); initEvents();
     if (!state.breakingEnabled) setBreakingEnabled(false); else { const btn = $('#alerts-toggle'); btn.classList.add('alerts-active'); btn.setAttribute('aria-pressed','true'); }
     initChart();
