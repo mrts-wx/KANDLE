@@ -116,3 +116,9 @@ O deploy continua seguindo `wrangler.jsonc`: os arquivos estáticos devem ser se
 - O fundo do contêiner de cada widget acompanha o tema para não mostrar um bloco branco durante o carregamento.
 
 Para atualizar, substitua os arquivos de `public/` deste pacote na raiz do seu repositório e publique normalmente com o `wrangler.jsonc` já existente.
+
+## Atualização v1.5.2
+
+Esta versão melhora o tema dos widgets do TradingView (eles são reconstruídos com tema, fundo e cores de texto explícitos ao alternar entre claro e escuro), fixa a área de trabalho na página Notícias para que somente o feed role e amplia os feeds editoriais para política e economia do Brasil e do cenário global. A rota de notícias agrega sete feeds, incluindo buscas do Google News para política/economia e feeds separados de cripto.
+
+Após o deploy, confira `https://SEU-DOMINIO/api/news`: `items` deve conter manchetes com `category` igual a `brasil`, `crypto` ou `global`; `sources` mostra quais fontes responderam.

@@ -1,16 +1,16 @@
+const googleNewsFeed = (key, label, query, edition = 'br') => {
+  const params = edition === 'us'
+    ? { hl: 'en-US', gl: 'US', ceid: 'US:en' }
+    : { hl: 'pt-BR', gl: 'BR', ceid: 'BR:pt-419' };
+  return { key, label, url: `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${params.hl}&gl=${params.gl}&ceid=${encodeURIComponent(params.ceid)}` };
+};
+
 const FEEDS = [
-  {
-    key: 'brasil', label: 'BRASIL',
-    url: 'https://news.google.com/rss/search?q=%28mercado+financeiro+OR+Ibovespa+OR+Selic+OR+Banco+Central%29+when%3A1d&hl=pt-BR&gl=BR&ceid=BR%3Apt-419'
-  },
-  {
-    key: 'crypto', label: 'CRIPTO',
-    url: 'https://news.google.com/rss/search?q=%28Bitcoin+OR+Ethereum+OR+criptomoedas+OR+Binance%29+when%3A1d&hl=pt-BR&gl=BR&ceid=BR%3Apt-419'
-  },
-  {
-    key: 'global', label: 'GLOBAL',
-    url: 'https://news.google.com/rss/search?q=%28Wall+Street+OR+Federal+Reserve+OR+NASDAQ+OR+inflation+OR+tariffs%29+when%3A1d&hl=en-US&gl=US&ceid=US%3Aen'
-  },
+  googleNewsFeed('brasil', 'BRASIL · POLÍTICA', '(política OR governo OR Congresso OR Planalto OR STF OR eleições OR presidente OR ministério) when:2d'),
+  googleNewsFeed('brasil', 'BRASIL · ECONOMIA', '(economia brasileira OR inflação OR Selic OR Banco Central OR dólar OR Ibovespa OR mercado financeiro) when:2d'),
+  googleNewsFeed('crypto', 'CRIPTO', '(Bitcoin OR Ethereum OR criptomoedas OR Binance OR blockchain) when:2d'),
+  googleNewsFeed('global', 'GLOBAL · POLÍTICA', '(política internacional OR eleições EUA OR Donald Trump OR Casa Branca OR guerra OR tarifas OR sanções OR geopolítica) when:2d'),
+  googleNewsFeed('global', 'GLOBAL · ECONOMIA', '(Federal Reserve OR Wall Street OR inflation OR interest rates OR stock market OR GDP OR trade tariffs) when:2d', 'us'),
   { key: 'crypto', label: 'COINDESK', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' },
   { key: 'crypto', label: 'COINTELEGRAPH', url: 'https://cointelegraph.com/rss' }
 ];

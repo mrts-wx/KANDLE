@@ -13,12 +13,22 @@
     { symbol: 'AVAXUSDT', ticker: 'AVAX', name: 'Avalanche', glyph: '▲', className: 'avax' }
   ];
   const API = 'https://data-api.binance.vision/api/v3';
+  const googleNewsFeed = (key, label, query, edition = 'br') => {
+    const params = edition === 'us'
+      ? { hl: 'en-US', gl: 'US', ceid: 'US:en' }
+      : { hl: 'pt-BR', gl: 'BR', ceid: 'BR:pt-419' };
+    return { key, label, url: `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${params.hl}&gl=${params.gl}&ceid=${encodeURIComponent(params.ceid)}` };
+  };
   const NEWS_FEEDS = [
-    { key: 'brasil', label: 'BRASIL', url: 'https://news.google.com/rss/search?q=%28mercado+financeiro+OR+Ibovespa+OR+Selic+OR+Banco+Central%29+when%3A2d&hl=pt-BR&gl=BR&ceid=BR%3Apt-419' },
-    { key: 'crypto', label: 'CRIPTO', url: 'https://news.google.com/rss/search?q=%28Bitcoin+OR+Ethereum+OR+criptomoedas+OR+Binance%29+when%3A2d&hl=pt-BR&gl=BR&ceid=BR%3Apt-419' },
-    { key: 'global', label: 'GLOBAL', url: 'https://news.google.com/rss/search?q=%28Wall+Street+OR+Federal+Reserve+OR+NASDAQ+OR+inflation+OR+tariffs%29+when%3A2d&hl=en-US&gl=US&ceid=US%3Aen' }
+    googleNewsFeed('brasil', 'BRASIL · POLÍTICA', '(política OR governo OR Congresso OR Planalto OR STF OR eleições OR presidente OR ministério) when:2d'),
+    googleNewsFeed('brasil', 'BRASIL · ECONOMIA', '(economia brasileira OR inflação OR Selic OR Banco Central OR dólar OR Ibovespa OR mercado financeiro) when:2d'),
+    googleNewsFeed('crypto', 'CRIPTO', '(Bitcoin OR Ethereum OR criptomoedas OR Binance OR blockchain) when:2d'),
+    googleNewsFeed('global', 'GLOBAL · POLÍTICA', '(política internacional OR eleições EUA OR Donald Trump OR Casa Branca OR guerra OR tarifas OR sanções OR geopolítica) when:2d'),
+    googleNewsFeed('global', 'GLOBAL · ECONOMIA', '(Federal Reserve OR Wall Street OR inflation OR interest rates OR stock market OR GDP OR trade tariffs) when:2d', 'us'),
+    { key: 'crypto', label: 'COINDESK', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' },
+    { key: 'crypto', label: 'COINTELEGRAPH', url: 'https://cointelegraph.com/rss' }
   ];
-  const HIGH_PRIORITY = /emerg.ncia|breaking|urgente|alerta de mercado|colapso|crash|despenca|desab[aã]|derrete|queda de \d{1,2}%|alta de \d{1,2}%|sobe \d{1,2}%|salta|dispara|surge|plunge|recorde hist.rico|máxima hist.rica|mínima hist.rica|decisão de juros|corta juros|eleva juros|taxa de juros|federal reserve.{0,45}(cut|raise|rate|juros)|banco central.{0,45}(juros|taxa|corte)|infla..o.{0,35}(acima|abaixo|acelera|desacelera|surpreende)|cpi.{0,35}(above|below|surprise)|sec.{0,35}(aprova|rejeita|sues|lawsuit)|aprova..o.{0,35}etf|etf.{0,35}(aprova|approved|inflow|record)|liquida..o|hack|ataque cibern.tico|fal.ncia|default|tarif.{0,35}(anuncia|impo|sobe)|san..es|recess.o/i;
+  const HIGH_PRIORITY = /emerg.ncia|breaking|urgente|alerta de mercado|colapso|crash|despenca|desab[aã]|derrete|queda de \d{1,2}%|alta de \d{1,2}%|sobe \d{1,2}%|salta|dispara|surge|plunge|recorde hist.rico|máxima hist.rica|mínima hist.rica|decisão de juros|corta juros|eleva juros|taxa de juros|federal reserve.{0,45}(cut|raise|rate|juros)|banco central.{0,45}(juros|taxa|corte)|infla..o.{0,35}(acima|abaixo|acelera|desacelera|surpreende)|cpi.{0,35}(above|below|surprise)|sec.{0,35}(aprova|rejeita|sues|lawsuit)|aprova..o.{0,35}etf|etf.{0,35}(aprova|approved|inflow|record)|liquida..o|hack|ataque cibern.tico|fal.ncia|default|tarif.{0,35}(anuncia|impo|sobe)|san..es|recess.o|invas.o|ataque militar|estado de emerg.ncia|renuncia|impeachment|resultado eleitoral|elei..es presidenciais|queda de governo|acordo de paz/i;
   const state = {
     prices: {}, selectedSymbol: 'BTCUSDT', interval: '1h', chart: null, candleSeries: null, volumeSeries: null,
     candles: [], socket: null, tickerSocket: null, tickerRetry: null, klineRetry: null,
@@ -174,6 +184,7 @@
   function setTheme(theme, { persist = true } = {}) {
     state.theme = theme === 'light' ? 'light' : 'dark';
     document.documentElement.dataset.theme = state.theme;
+    document.documentElement.style.colorScheme = state.theme === 'light' ? 'light' : 'dark';
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', state.theme === 'light' ? '#e8edf3' : '#101216');
     const button = $('#theme-toggle');
@@ -193,13 +204,18 @@
       container.dataset.tvInitialized = 'false';
       container.dataset.tvGeneration = String((Number(container.dataset.tvGeneration) || 0) + 1);
       const host = container.querySelector('.tradingview-widget-container__widget');
+      container.dataset.tvTheme = '';
       if (host) {
-        host.innerHTML = '<div class="macro-widget-loading">Atualizando tema do gráfico…</div>';
+        host.replaceChildren();
+        const loading = document.createElement('div');
+        loading.className = 'macro-widget-loading';
+        loading.textContent = 'Atualizando tema do gráfico…';
+        host.appendChild(loading);
         delete host.dataset.fallbackShown;
       }
-      container.querySelectorAll('script').forEach(script => script.remove());
+      container.querySelectorAll('iframe, script').forEach(element => element.remove());
     });
-    if (document.body.dataset.currentPage === 'markets') window.setTimeout(initializeMacroWidgets, 80);
+    if (document.body.dataset.currentPage === 'markets') requestAnimationFrame(() => initializeMacroWidgets());
   }
   function initChart() {
     const container = $('#candlestick-chart');
@@ -613,7 +629,9 @@
     const hours = Math.floor(minutes/60); if (hours < 24) return `${hours}H ATRÁS`;
     return date.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.','').toUpperCase();
   }
-  function renderNews() {
+  function renderNews({ preserveScroll = true } = {}) {
+    const feedElement = $('#news-feed');
+    const previousScrollTop = feedElement ? feedElement.scrollTop : 0;
     const filter = state.newsFilter; const filtered = state.news.filter(item => filter === 'all' || item.category === filter);
     const navNewsCount = $('#news-count'); if (navNewsCount) navNewsCount.textContent = state.news.length || '—';
     $('#all-news-count').textContent = state.news.length;
@@ -621,13 +639,16 @@
       const empty = state.news.length
         ? `<div class="news-empty"><strong>Sem manchetes para este filtro.</strong>Troque a categoria ou atualize as fontes de notícias.</div>`
         : `<div class="news-empty news-error"><strong>O radar ainda não recebeu manchetes.</strong><span>As cotações continuam funcionando; as notícias dependem das fontes externas. Use atualizar para tentar de novo.</span>${renderSourceDiagnostics(state.newsSources)}</div>`;
-      $('#news-feed').innerHTML = empty; return;
+      $('#news-feed').innerHTML = empty;
+      if (feedElement) feedElement.scrollTop = preserveScroll ? previousScrollTop : 0;
+      return;
     }
     $('#news-feed').innerHTML = filtered.slice(0, 24).map(item => {
       const breaking = isBreaking(item); const time = formatNewsTime(item.published); const description = item.description.length > 240 ? item.description.slice(0, 237) + '…' : item.description;
       const tagClass = item.category === 'brasil' ? 'tag-brasil' : item.category === 'global' ? 'tag-global' : '';
       return `<article class="news-item ${breaking ? 'urgent-news' : ''}"><div class="news-timebox"><strong>${escapeHTML(time.split(' ')[0])}</strong><span>${escapeHTML(time.includes('ATRÁS') ? 'ATRÁS' : time.includes('MIN') ? 'MINUTOS' : time === 'AGORA' ? 'AGORA' : 'PUBLICADO')}</span></div><div class="news-body"><div class="news-meta"><span class="news-tag ${tagClass}">${escapeHTML(item.categoryLabel)}</span>${breaking ? '<span class="news-tag tag-breaking">RADAR</span>' : ''}<span class="news-source">${escapeHTML(item.source)}</span></div><h3>${escapeHTML(item.title)}</h3>${description ? `<p>${escapeHTML(description)}</p>` : ''}</div>${item.url ? `<a class="news-open" href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer" title="Abrir matéria"><i data-lucide="arrow-up-right"></i></a>` : ''}</article>`;
     }).join('');
+    if (feedElement) feedElement.scrollTop = preserveScroll ? previousScrollTop : 0;
     if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
   }
   function showNextBreaking() {
@@ -675,15 +696,22 @@
   function initializeMacroWidgets() {
     const isLight = document.documentElement.dataset.theme === 'light';
     const widgetTheme = isLight ? 'light' : 'dark';
+    const accent = isLight ? '#00788B' : '#55F3FF';
     const widgetBackground = isLight ? '#FFFFFF' : '#20242B';
     const widgetText = isLight ? '#17202D' : '#F2F5FD';
     const widgetMuted = isLight ? '#566171' : '#AEB8C8';
-    const accent = isLight ? '#00788B' : '#55F3FF';
     $$('.macro-widget-card .tradingview-widget-container[data-tv-symbol]').forEach(container => {
-      if (container.dataset.tvInitialized === 'true') return;
+      if (container.dataset.tvInitialized === 'true' && container.dataset.tvTheme === widgetTheme) return;
       const host = container.querySelector('.tradingview-widget-container__widget');
       if (!host || !container.dataset.tvSymbol) return;
+      container.querySelectorAll('iframe, script').forEach(element => element.remove());
+      host.replaceChildren();
+      const loading = document.createElement('div');
+      loading.className = 'macro-widget-loading';
+      loading.textContent = 'Carregando cotação…';
+      host.appendChild(loading);
       container.dataset.tvInitialized = 'true';
+      container.dataset.tvTheme = widgetTheme;
       const generation = Number(container.dataset.tvGeneration) || 0;
       const expectedTheme = widgetTheme;
       const script = document.createElement('script');
@@ -702,6 +730,7 @@
         backgroundColor: widgetBackground,
         widgetFontColor: widgetText,
         fontColor: widgetMuted,
+        isTransparent: false,
         trendLineColor: accent,
         underLineColor: accent,
         underLineBottomColor: isLight ? 'rgba(0,120,139,0)' : 'rgba(85,243,255,0)',
@@ -745,7 +774,8 @@
     const breadcrumb = $('#page-breadcrumb');
     if (breadcrumb) breadcrumb.textContent = labels[page];
     document.body.dataset.currentPage = page;
-    if (scroll) window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (scroll) window.scrollTo({ top: 0, behavior: page === 'news' || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (page === 'news' && scroll) { const feed = $('#news-feed'); if (feed) feed.scrollTop = 0; }
     if (page === 'markets') requestAnimationFrame(() => {
       initializeMacroWidgets();
       const container = $('#candlestick-chart');
@@ -756,7 +786,7 @@
   function initEvents() {
     $('#chart-asset-select').addEventListener('change', event => { state.selectedSymbol = event.target.value; updateChartHeader(); loadCandles(); });
     $('#timeframe-group').addEventListener('click', event => { const button = event.target.closest('button[data-interval]'); if (!button) return; state.interval = button.dataset.interval; $$('#timeframe-group button').forEach(btn => btn.classList.toggle('active', btn === button)); loadCandles(); });
-    $('#news-filters').addEventListener('click', event => { const button = event.target.closest('button[data-news-filter]'); if (!button) return; state.newsFilter = button.dataset.newsFilter; $$('#news-filters button').forEach(btn => btn.classList.toggle('active', btn === button)); renderNews(); });
+    $('#news-filters').addEventListener('click', event => { const button = event.target.closest('button[data-news-filter]'); if (!button) return; state.newsFilter = button.dataset.newsFilter; $$('#news-filters button').forEach(btn => btn.classList.toggle('active', btn === button)); renderNews({ preserveScroll: false }); });
     $('#asset-filters').addEventListener('click', event => { const button = event.target.closest('button[data-asset-filter]'); if (!button) return; state.assetFilter = button.dataset.assetFilter; $$('#asset-filters button').forEach(btn => btn.classList.toggle('active', btn === button)); renderAssetTable(); });
     $('#asset-search').addEventListener('input', event => { state.assetSearch = event.target.value.trim(); renderAssetTable(); });
     document.addEventListener('click', event => { const button = event.target.closest('[data-favorite]'); if (button) { event.preventDefault(); event.stopPropagation(); toggleFavorite(button.dataset.favorite); } });
