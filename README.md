@@ -1,52 +1,53 @@
 # KANDLE — Market Intelligence
 
-Terminal responsivo para acompanhar criptoativos, candles, notícias financeiras, breaking news e uma watchlist. A camada de interface usa a identidade **Obsidian Glass & Liquid Bevel**: painel geral de vidro flutuante, reflexos chanfrados, bordas neon suaves e acentos financeiros em verde/vermelho. A KANDLE AI continua em modo de aviso de lançamento e não faz chamadas de inferência.
+Terminal responsivo para acompanhar criptoativos, candles, notícias financeiras, breaking news e uma watchlist. Esta edição mantém a identidade **Obsidian Glass & Liquid Bevel**, navegação separada por páginas, favoritos neon e a vinheta sonora original do Breaking News. A KANDLE AI continua em modo de aviso de lançamento e não faz chamadas de inferência.
 
-## O que existe no projeto
+## Correção importante de deploy — `Asset too large`
 
-- Cotações públicas de BTC, ETH, SOL, BNB, XRP, DOGE, ADA e AVAX via Binance Spot + WebSocket.
-- Candles OHLCV com seleção de ativo e intervalos.
-- Notícias agregadas no servidor, com cinco fontes, deduplicação, status por origem e fallback de RSS para RSS2JSON quando a busca direta falhar.
-- Breaking News global: a animação pode aparecer em qualquer página e está corrigida para não gerar barra de rolagem horizontal.
-- Favoritos com um único ícone bookmark, preenchimento verde e glow, sem quadrado sobreposto.
-- Três páginas independentes: Notícias (tela inicial), Mercados e Watchlist.
-- Widgets TradingView isolados. Como alguns símbolos oficiais não podem ser mostrados dentro de widgets externos, Nasdaq e Dow usam instrumentos de referência incorporáveis e mantêm links aos símbolos originais; a interface explica essa diferença.
-- Endpoint da KANDLE AI preparado para uso futuro, mas desabilitado por padrão.
+Esta versão **inclui também o KANDLE Breaking Sound da v1.4** e corrige o erro do Cloudflare Workers que aparecia assim:
+
+```text
+Asset too large
+.../node_modules/workerd/bin/workerd (137 MiB)
+```
+
+O problema era configurar a raiz do repositório (`.`) como pasta de assets estáticos. Em builds, o `npm install` cria `node_modules/`, e o Wrangler tentava publicar o executável `workerd` como se fosse um arquivo público do site.
+
+**Agora, somente a pasta `public/` é publicada como asset estático.** O código do Worker e do servidor fica fora dela.
 
 ## Estrutura
 
 ```text
 .
-├── index.html                 # interface
-├── styles.css                 # estilos, vidro, animações e responsividade
-├── app.js                     # dados, candles, navegação e breaking news
-├── ai.js                      # popup de desenvolvimento; não chama IA
-├── worker.js                  # roteia /api/news e serve os assets estáticos
-├── wrangler.jsonc             # configuração Cloudflare Workers + Static Assets
-├── .assetsignore              # evita publicar fontes/arquivos privados como assets
-├── functions/api/news.js      # agregador RSS compartilhado entre Worker e Pages
-├── functions/api/ai.js        # endpoint futuro de IA (bloqueado por padrão)
-├── quota-worker/              # Durable Object para cotas futuras da IA
-├── AI-SETUP.md                # guia de lançamento futuro do chatbot
-└── MONETIZATION.md            # plano de monetização
+├── public/
+│   ├── index.html       # interface do site
+│   ├── styles.css       # visual Liquid Glass e responsividade
+│   ├── app.js           # cotações, candles, navegação e breaking news
+│   ├── ai.js            # popup de IA em modo de desenvolvimento
+│   └── 404.html         # página de não encontrado
+├── worker.js            # roteia APIs e serve env.ASSETS
+├── wrangler.jsonc       # assets.directory = ./public
+├── package.json         # scripts para Wrangler
+├── functions/api/       # endpoints de notícias e IA
+├── quota-worker/        # código de cotas para lançamento futuro da IA
+├── AI-SETUP.md          # guia futuro da IA
+└── MONETIZATION.md      # plano de monetização
 ```
 
-## Deploy recomendado — Cloudflare Workers (domínio `workers.dev`)
+## Deploy pelo GitHub + Cloudflare Workers Builds
 
-Este repositório inclui `wrangler.jsonc` e `worker.js` porque a KANDLE está sendo servida no domínio `*.workers.dev`. O worker trata `/api/news` e repassa todas as outras URLs para o armazenamento de assets estáticos. As Functions de `functions/` continuam disponíveis para uma implantação Pages separada.
+1. Extraia este ZIP.
+2. Substitua os arquivos do repositório pela estrutura deste pacote. **Importante:** mantenha a pasta `public/` na raiz do repositório e envie todos os arquivos de configuração. Não coloque `node_modules/` no Git.
+3. No painel Cloudflare, abra o Worker ligado ao GitHub e confirme que o deploy usa o `wrangler.jsonc` da raiz do repositório.
+4. Use o comando de deploy configurado no seu fluxo (por exemplo, `npm run deploy`). O Wrangler lerá `assets.directory: "./public"` e só enviará essa pasta como assets do site.
+5. Não configure a raiz inteira do repositório como diretório de assets no painel. A raiz contém código do Worker, funções, arquivos de documentação e pode conter `node_modules/` durante o build.
+6. Após o deploy, valide as rotas abaixo.
 
-### Pelo painel Workers Builds ligado ao GitHub
+Se o painel tiver um campo manual de diretório de assets substituindo a configuração Wrangler, remova essa substituição e faça o Wrangler usar o `wrangler.jsonc` do repositório.
 
-1. Envie **todos os arquivos da raiz do ZIP** para a raiz do repositório privado, incluindo `worker.js`, `wrangler.jsonc`, `package.json` e `.assetsignore`.
-2. Em **Workers & Pages**, abra o Worker conectado ao GitHub e confirme que o build usa a configuração Wrangler do repositório.
-3. Use o comando de deploy `npm run deploy` (ou o equivalente exibido pelo painel de builds) e não informe um diretório público separado: o Wrangler lê `assets.directory` do `wrangler.jsonc`.
-4. Após concluir o deploy, abra primeiro `https://SEU-WORKER.workers.dev/api/health`. Deve retornar JSON com `"ok": true`.
-5. Depois abra `https://SEU-WORKER.workers.dev/api/news`. Deve retornar JSON com `items`, `sources`, `updatedAt` e `partial`. Cada fonte contém `ok`, `count` e, se falhar, `error`.
-6. Abra a raiz do site e atualize com `Ctrl+F5`. Notícias é a tela inicial independentemente de um hash antigo na URL.
+## Deploy local
 
-### Deploy local pelo Wrangler
-
-É necessário Node.js e uma sessão autenticada na Cloudflare:
+Requer Node.js instalado e login na Cloudflare:
 
 ```bash
 npm install
@@ -54,34 +55,41 @@ npx wrangler login
 npm run dev
 ```
 
-Teste `http://localhost:8787/api/health` e `http://localhost:8787/api/news`. Para publicar:
+Teste:
+
+- `http://localhost:8787/api/health` — esperado: JSON com `ok: true`.
+- `http://localhost:8787/api/news` — JSON de notícias e diagnóstico individual das fontes.
+- `http://localhost:8787/` — interface KANDLE.
+
+Para publicar localmente:
 
 ```bash
 npm run deploy
 ```
 
-O nome do Worker está configurado como `kandle` em `wrangler.jsonc`. Se o nome do Worker da sua conta for diferente, ajuste `name` antes de fazer deploy.
-
-### Alternativa — Cloudflare Pages
-
-Se preferir Pages em vez de Workers, configure preset None e output `.`. O arquivo `functions/api/news.js` é publicado como `/api/news` pelas Pages Functions. Não use a mesma configuração mental de um projeto Pages para um Worker `workers.dev`: a diferença entre os runtimes é importante para a rota de notícias.
+O nome configurado do Worker é `kandle`. Altere `name` em `wrangler.jsonc` caso seu Worker tenha outro nome.
 
 ## Diagnóstico de notícias
 
-- `GET /api/health`: verifica se o Worker roteia requisições.
-- `GET /api/ai`: mostra apenas se a funcionalidade de IA está ligada; deve retornar `enabled: false` neste lançamento. POST responde com estado de desenvolvimento (503) enquanto a chave de segurança estiver desligada.
-- `GET /api/news`: consulta os feeds no servidor e retorna o status individual das fontes.
-- O endpoint faz tentativa direta ao RSS e, se necessário, usa RSS2JSON como fallback. Como as fontes são serviços de terceiros, uma origem pode ficar fora do ar, alterar o XML ou limitar consultas. Se `items` estiver vazio, examine `sources[].error` antes de mudar o frontend.
-- No site, a seção de notícias mostra um diagnóstico por fonte quando não recebe manchetes. O botão de atualizar aciona uma nova tentativa.
+- `GET /api/health`: confirma que o Worker responde.
+- `GET /api/news`: retorna `items`, `sources`, `updatedAt` e `partial`; fontes individuais informam `ok`, `count` e erro quando houver.
+- A agregação RSS acontece no servidor. Feeds de terceiros podem limitar, mudar o XML ou ficar fora do ar. Se não houver manchetes, veja `sources[].error` antes de alterar o frontend.
 
-## KANDLE AI — ainda não lançada
+## Funcionalidades incluídas
 
-O popup aparece na interface, mas só exibe a mensagem de desenvolvimento e não envia mensagens. Para lançar o chatbot depois, siga `AI-SETUP.md` integralmente: publicar o endpoint, configurar Workers AI, Durable Object e segredos, validar as cotas e somente então habilitar o recurso. A IA usa custos/franquias próprios do provedor, mesmo com uma interface gratuita.
+- Cotações públicas e candles de cripto via Binance Spot/streams públicos.
+- Notícias agregadas por servidor, com status por fonte.
+- Breaking News global com vinheta original criada via Web Audio API; o som não reproduz a assinatura sonora da CNN.
+- Preferência de som salva no navegador e teste de alerta.
+- Páginas independentes Notícias (inicial), Mercados e Watchlist.
+- Favoritos com bookmark preenchido em verde neon.
+- Widgets TradingView; referências alternativas para Nasdaq/Dow podem divergir dos símbolos oficiais, conforme indicado na interface.
+- IA ainda desativada. Consulte `AI-SETUP.md` para planejar o lançamento futuro.
 
-## Dados e limitações
+## Se o deploy ainda falhar
 
-- Cripto: `https://data-api.binance.vision/api/v3` e streams públicos da Binance.
-- Notícias: RSS de Google News/feeds cripto, com agregação em `/api/news`.
-- Macroeconomia: widgets do TradingView. As referências OANDA/TVC podem diferir dos índices originais, conforme avisado na interface. O TradingView explica que o prefixo `TVC:` indica dados calculados pelo próprio TradingView e não deve ser comparado diretamente ao símbolo original.
-- O painel é somente leitura e não envia ordens ou conecta carteiras.
-- Dados financeiros e manchetes podem atrasar ou conter erros; consulte a fonte original e não use o dashboard como recomendação individual.
+Confirme que o erro novo não está apontando para `node_modules/workerd`. No `wrangler.jsonc`, o diretório precisa ser exatamente `./public`. Verifique também se a pasta `public/` aparece no commit do GitHub. Não adicione `node_modules` à pasta `public`.
+
+## Limitações
+
+Cotações, feeds e widgets dependem de serviços externos e podem sofrer indisponibilidade. O painel é informativo; ele não envia ordens nem conecta carteiras e não é recomendação financeira individual.
