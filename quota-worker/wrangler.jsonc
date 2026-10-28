@@ -1,0 +1,15 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "kandle-ai-quota",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-27",
+  "durable_objects": {
+    "bindings": [
+      { "name": "KANDLE_QUOTA", "class_name": "KandleQuota" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["KandleQuota"] }
+  ],
+  "observability": { "enabled": true }
+}
