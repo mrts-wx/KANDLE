@@ -27,7 +27,9 @@
     newsLoading: false, breakingEnabled: readJSON('kandle-breaking-enabled', true),
     breakingSoundEnabled: readJSON('kandle-breaking-sound-enabled', true), audioContext: null,
     seenNews: readJSON('kandle-seen-news', []), breakingQueue: [], breakingActive: false, breakingTimers: [], chartResizeObserver: null,
-    refreshTimer: null, firstPriceLoad: false, chartLibraryFailed: typeof window.LightweightCharts === 'undefined'
+    refreshTimer: null, firstPriceLoad: false, chartLibraryFailed: typeof window.LightweightCharts === 'undefined',
+    pendingTickerSymbols: new Set(), tickerFlushTimer: null, lastRadarSignature: '', lastTableUpdateAt: 0,
+    theme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'
   };
 
   function readJSON(key, fallback) { try { const value = JSON.parse(localStorage.getItem(key)); return value ?? fallback; } catch { return fallback; } }
@@ -36,16 +38,22 @@
   function stripHTML(value) { const box = document.createElement('textarea'); box.innerHTML = String(value || '').replace(/<[^>]*>/g, ' '); return box.value.replace(/\s+/g, ' ').trim(); }
   function assetFor(symbol) { return ASSETS.find(asset => asset.symbol === symbol) || ASSETS[0]; }
   function numeric(value) { const number = Number(value); return Number.isFinite(number) ? number : 0; }
+  const priceFormatters = new Map();
+  const compactFormatter = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 });
   function formatPrice(value) {
     const number = numeric(value);
     if (!number) return '—';
     const decimals = number < 0.01 ? 6 : number < 1 ? 5 : number < 100 ? 3 : 2;
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: number < 1 ? Math.min(4, decimals) : 2, maximumFractionDigits: decimals }).format(number);
+    const minimum = number < 1 ? Math.min(4, decimals) : 2;
+    const key = `${minimum}:${decimals}`;
+    let formatter = priceFormatters.get(key);
+    if (!formatter) { formatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: minimum, maximumFractionDigits: decimals }); priceFormatters.set(key, formatter); }
+    return formatter.format(number);
   }
   function formatCompact(value) {
     const number = numeric(value);
     if (!number) return '—';
-    return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(number);
+    return compactFormatter.format(number);
   }
   function formatVolume(value) { const number = numeric(value); return number ? '$' + formatCompact(number) : '—'; }
   function formatPct(value) { const number = numeric(value); return `${number > 0 ? '+' : ''}${number.toFixed(2)}%`; }
@@ -136,29 +144,77 @@
   function initDateClock() {
     const now = new Date(); const day = new Intl.DateTimeFormat('pt-BR', { day: '2-digit' }).format(now); const month = new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(now).replace('.', '').toUpperCase(); const year = now.getFullYear();
     $('#today-date').textContent = `${day} ${month} ${year}`;
+    const clockFormatter = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     const tick = () => {
-      const now = new Date(); const time = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
-      $('#clock').textContent = time; $('#ticker-time').textContent = time;
+      const time = clockFormatter.format(new Date());
+      setTextIfChanged($('#clock'), time); setTextIfChanged($('#ticker-time'), time);
     };
     tick(); window.setInterval(tick, 1000);
   }
   function avatarHTML(asset, extra = '') { return `<span class="coin-avatar ${escapeHTML(asset.className)} ${extra}" aria-hidden="true">${escapeHTML(asset.glyph)}</span>`; }
+  function chartPalette() {
+    const light = document.documentElement.dataset.theme === 'light';
+    return light
+      ? { up: '#00864f', down: '#cf204d', upVolume: 'rgba(0,134,79,.23)', downVolume: 'rgba(207,32,77,.22)', text: '#566171', grid: 'rgba(31,43,59,.10)', border: 'rgba(31,43,59,.16)', cross: 'rgba(0,109,128,.32)' }
+      : { up: '#00e575', down: '#ff426f', upVolume: 'rgba(0,229,117,.25)', downVolume: 'rgba(255,66,111,.25)', text: '#aeb8c8', grid: 'rgba(174,188,210,.09)', border: 'rgba(174,188,210,.16)', cross: 'rgba(103,232,242,.32)' };
+  }
+  function applyChartTheme() {
+    const p = chartPalette();
+    if (state.chart) state.chart.applyOptions({
+      layout: { textColor: p.text },
+      grid: { vertLines: { color: p.grid }, horzLines: { color: p.grid } },
+      rightPriceScale: { borderColor: p.border },
+      timeScale: { borderColor: p.border },
+      crosshair: { vertLine: { color: p.cross }, horzLine: { color: p.cross } }
+    });
+    state.candleSeries?.applyOptions({ upColor: p.up, downColor: p.down, borderUpColor: p.up, borderDownColor: p.down, wickUpColor: p.up, wickDownColor: p.down });
+    if (state.volumeSeries && state.candles.length) state.volumeSeries.setData(state.candles.map(c => ({ time: c.time, value: c.volume, color: c.close >= c.open ? p.upVolume : p.downVolume })));
+    if (state.chartLibraryFailed) drawFallbackChart();
+  }
+  function setTheme(theme, { persist = true } = {}) {
+    state.theme = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = state.theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', state.theme === 'light' ? '#e8edf3' : '#101216');
+    const button = $('#theme-toggle');
+    if (button) {
+      const light = state.theme === 'light';
+      button.innerHTML = `<i data-lucide="${light ? 'moon' : 'sun'}"></i>`;
+      button.title = light ? 'Mudar para tema cinza-chumbo' : 'Mudar para tema branco';
+      button.setAttribute('aria-label', button.title);
+      button.setAttribute('aria-pressed', String(light));
+      if (window.lucide) window.lucide.createIcons({ root: button, attrs: { 'stroke-width': 1.8 } });
+    }
+    if (persist) writeJSON('kandle-theme', state.theme);
+    applyChartTheme();
+    // TradingView embeds inherit their theme only at initialization. Reload them after a theme change.
+    $$('.macro-widget-card .tradingview-widget-container').forEach(container => {
+      if (container.dataset.tvInitialized === 'true') {
+        container.dataset.tvInitialized = 'false';
+        const host = container.querySelector('.tradingview-widget-container__widget');
+        if (host) host.innerHTML = '<div class="macro-widget-loading">Atualizando tema do gráfico…</div>';
+        container.querySelectorAll('script').forEach(script => script.remove());
+      }
+    });
+    if (document.body.dataset.currentPage === 'markets') window.setTimeout(initializeMacroWidgets, 100);
+  }
   function initChart() {
     const container = $('#candlestick-chart');
     if (!window.LightweightCharts) { state.chartLibraryFailed = true; $('#fallback-chart').hidden = false; return; }
     container.innerHTML = ''; $('#fallback-chart').hidden = true;
     try {
+      const palette = chartPalette();
       state.chart = LightweightCharts.createChart(container, {
         width: container.clientWidth || 650, height: container.clientHeight || 330,
-        layout: { background: { type: 'solid', color: 'rgba(0,0,0,0)' }, textColor: '#77859e', fontFamily: 'DM Mono, monospace', fontSize: 10 },
-        grid: { vertLines: { color: 'rgba(129,151,191,.075)' }, horzLines: { color: 'rgba(129,151,191,.09)' } },
-        rightPriceScale: { borderColor: 'rgba(129,151,191,.15)', scaleMargins: { top: .09, bottom: .22 } },
-        timeScale: { borderColor: 'rgba(129,151,191,.15)', timeVisible: true, secondsVisible: false, rightOffset: 4, barSpacing: 7, minBarSpacing: 3 },
-        crosshair: { vertLine: { color: 'rgba(85,243,255,.33)', width: 1, style: LightweightCharts.LineStyle.Dashed }, horzLine: { color: 'rgba(85,243,255,.24)', width: 1, style: LightweightCharts.LineStyle.Dashed } },
+        layout: { background: { type: 'solid', color: 'rgba(0,0,0,0)' }, textColor: palette.text, fontFamily: 'DM Mono, monospace', fontSize: 10 },
+        grid: { vertLines: { color: palette.grid }, horzLines: { color: palette.grid } },
+        rightPriceScale: { borderColor: palette.border, scaleMargins: { top: .09, bottom: .22 } },
+        timeScale: { borderColor: palette.border, timeVisible: true, secondsVisible: false, rightOffset: 4, barSpacing: 7, minBarSpacing: 3 },
+        crosshair: { vertLine: { color: palette.cross, width: 1, style: LightweightCharts.LineStyle.Dashed }, horzLine: { color: palette.cross, width: 1, style: LightweightCharts.LineStyle.Dashed } },
         localization: { priceFormatter: price => formatPrice(price) },
         handleScroll: { mouseWheel: true, pressedMouseMove: true }, handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true }
       });
-      state.candleSeries = state.chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: '#18f6a3', downColor: '#ff466e', borderUpColor: '#18f6a3', borderDownColor: '#ff466e', wickUpColor: '#18f6a3', wickDownColor: '#ff466e', priceLineColor: '#55f3ff', priceLineStyle: LightweightCharts.LineStyle.Dotted });
+      state.candleSeries = state.chart.addSeries(LightweightCharts.CandlestickSeries, { upColor: palette.up, downColor: palette.down, borderUpColor: palette.up, borderDownColor: palette.down, wickUpColor: palette.up, wickDownColor: palette.down, priceLineColor: palette.cross, priceLineStyle: LightweightCharts.LineStyle.Dotted });
       state.volumeSeries = state.chart.addSeries(LightweightCharts.HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: '' });
       state.volumeSeries.priceScale().applyOptions({ scaleMargins: { top: .82, bottom: 0 }, visible: false });
       if (!state.chartResizeObserver) {
@@ -213,33 +269,68 @@
     state.tickerSocket = socket;
     socket.onopen = () => { setConnection('Conexão de mercado ativa', 'LIVE WS', true); };
     socket.onmessage = event => {
-      try { const message = JSON.parse(event.data); const data = message.data || message; if (data.s) { applyTicker({ symbol: data.s, lastPrice: data.c, priceChangePercent: data.P, highPrice: data.h, lowPrice: data.l, quoteVolume: data.q, volume: data.v, count: data.n, openPrice: data.o, weightedAvgPrice: data.w }); updateTickerDOM(data.s); } }
+      try { const message = JSON.parse(event.data); const data = message.data || message; if (data.s) { applyTicker({ symbol: data.s, lastPrice: data.c, priceChangePercent: data.P, highPrice: data.h, lowPrice: data.l, quoteVolume: data.q, volume: data.v, count: data.n, openPrice: data.o, weightedAvgPrice: data.w }); queueTickerDOM(data.s); } }
       catch (error) { console.warn('Bad ticker websocket payload', error); }
     };
     socket.onerror = () => setConnection('Reconectando ao mercado', 'RETRY', false);
     socket.onclose = () => { if (state.tickerSocket === socket) { setConnection('Reconectando ao mercado', 'RETRY', false); scheduleTickerReconnect(); } };
   }
   function scheduleTickerReconnect() { if (state.tickerRetry) clearTimeout(state.tickerRetry); state.tickerRetry = setTimeout(connectTickerSocket, 4500); }
+  function queueTickerDOM(symbol) {
+    state.pendingTickerSymbols.add(symbol);
+    if (state.tickerFlushTimer) return;
+    // Coalesce bursts into at most ~10 UI refreshes per second; the live socket remains real-time.
+    state.tickerFlushTimer = window.setTimeout(() => {
+      state.tickerFlushTimer = null;
+      const changed = [...state.pendingTickerSymbols];
+      state.pendingTickerSymbols.clear();
+      requestAnimationFrame(() => {
+        changed.forEach(updateTickerDOM);
+        if (changed.length) updateRadarValues();
+      });
+    }, 100);
+  }
+  function setTextIfChanged(element, value) {
+    if (element && element.textContent !== String(value)) element.textContent = String(value);
+  }
   function updateTickerDOM(symbol) {
     const asset = assetFor(symbol); const data = state.prices[symbol]; if (!data) return;
-    $$(`[data-price-for="${symbol}"]`).forEach(el => { const old = Number(el.dataset.lastValue || 0); el.textContent = formatPrice(data.price); el.dataset.lastValue = String(data.price); if (old && old !== data.price) { el.classList.remove('tick-up', 'tick-down'); void el.offsetWidth; el.classList.add(data.price >= old ? 'tick-up' : 'tick-down'); } });
-    $$(`[data-change-for="${symbol}"]`).forEach(el => { const styleClass = el.classList.contains('ticker-change') ? 'ticker-change' : 'metric-change'; el.className = `${styleClass} ${pctClass(data.change)}`; el.innerHTML = `${data.change > 0 ? '↗ ' : data.change < 0 ? '↘ ' : ''}${escapeHTML(formatPct(data.change))}`; });
+    $$(`[data-price-for="${symbol}"]`).forEach(el => {
+      const old = Number(el.dataset.lastValue || 0);
+      const nextText = formatPrice(data.price);
+      if (el.textContent !== nextText) {
+        setTextIfChanged(el, nextText);
+        if (old && old !== data.price) {
+          const flashClass = data.price >= old ? 'tick-up' : 'tick-down';
+          if (!el.classList.contains(flashClass)) {
+            el.classList.remove('tick-up', 'tick-down');
+            el.classList.add(flashClass);
+            el.addEventListener('animationend', () => el.classList.remove('tick-up', 'tick-down'), { once: true });
+          }
+        }
+      }
+      el.dataset.lastValue = String(data.price);
+    });
+    $$(`[data-change-for="${symbol}"]`).forEach(el => {
+      const styleClass = el.classList.contains('ticker-change') ? 'ticker-change' : 'metric-change';
+      const className = `${styleClass} ${pctClass(data.change)}`;
+      const text = `${data.change > 0 ? '↗ ' : data.change < 0 ? '↘ ' : ''}${formatPct(data.change)}`;
+      if (el.className !== className) el.className = className;
+      setTextIfChanged(el, text);
+    });
     const priceEl = $('#metric-btc-price'); const ethEl = $('#metric-eth-price');
     if (symbol === 'BTCUSDT') {
       setMetric(priceEl, data.price); setChange($('#metric-btc-change'), data.change);
-      $('#metric-btc-volume').textContent = formatVolume(data.volume); $('#btc-volume-bar').style.width = `${Math.min(100, Math.max(5, Math.log10(Math.max(10, data.volume)) / 12 * 100))}%`;
-      $('#chart-high').textContent = state.selectedSymbol === symbol ? formatPrice(data.high) : $('#chart-high').textContent;
-      $('#chart-low').textContent = state.selectedSymbol === symbol ? formatPrice(data.low) : $('#chart-low').textContent;
-      $('#chart-volume').textContent = state.selectedSymbol === symbol ? formatVolume(data.volume) : $('#chart-volume').textContent;
+      setTextIfChanged($('#metric-btc-volume'), formatVolume(data.volume)); $('#btc-volume-bar').style.width = `${Math.min(100, Math.max(5, Math.log10(Math.max(10, data.volume)) / 12 * 100))}%`;
+      if (state.selectedSymbol === symbol) { setTextIfChanged($('#chart-high'), formatPrice(data.high)); setTextIfChanged($('#chart-low'), formatPrice(data.low)); setTextIfChanged($('#chart-volume'), formatVolume(data.volume)); }
     } else if (symbol === 'ETHUSDT') { setMetric(ethEl, data.price); setChange($('#metric-eth-change'), data.change); const bar = $('.eth-bar span'); if (bar) bar.style.width = `${Math.min(100, Math.max(8, 50 + data.change * 4))}%`; }
     if (state.selectedSymbol === symbol) {
-      $('#chart-current-price').textContent = formatPrice(data.price); setChange($('#chart-current-change'), data.change);
-      $('#chart-high').textContent = formatPrice(data.high); $('#chart-low').textContent = formatPrice(data.low); $('#chart-volume').textContent = formatVolume(data.volume);
+      setTextIfChanged($('#chart-current-price'), formatPrice(data.price)); setChange($('#chart-current-change'), data.change);
+      setTextIfChanged($('#chart-high'), formatPrice(data.high)); setTextIfChanged($('#chart-low'), formatPrice(data.low)); setTextIfChanged($('#chart-volume'), formatVolume(data.volume));
     }
-    updateRadarValues();
   }
-  function setMetric(element, price) { if (element) element.textContent = formatPrice(price); }
-  function setChange(element, change) { if (!element) return; element.className = `metric-change ${pctClass(change)}`; element.innerHTML = `${change > 0 ? '↗ ' : change < 0 ? '↘ ' : ''}${escapeHTML(formatPct(change))}`; }
+  function setMetric(element, price) { setTextIfChanged(element, formatPrice(price)); }
+  function setChange(element, change) { if (!element) return; const className = `metric-change ${pctClass(change)}`; const text = `${change > 0 ? '↗ ' : change < 0 ? '↘ ' : ''}${formatPct(change)}`; if (element.className !== className) element.className = className; setTextIfChanged(element, text); }
   function renderAllPrices() { renderTickerRail(); renderMarketCards(); renderAssetTable(); renderPulseAssets(); updateHeroFromPrices(); updateChartHeader(); if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } }); }
   function renderTickerRail() {
     const track = $('#ticker-track'); track.innerHTML = ASSETS.map(asset => { const data = state.prices[asset.symbol]; return `<div class="ticker-item"><strong>${asset.ticker}</strong><span data-price-for="${asset.symbol}" data-last-value="${data?.price || 0}">${formatPrice(data?.price)}</span><span data-change-for="${asset.symbol}" class="ticker-change ${pctClass(data?.change)}">${escapeHTML(formatPct(data?.change))}</span></div>`; }).join('');
@@ -263,6 +354,9 @@
   }
   function updateRadarValues() {
     const known = ASSETS.filter(asset => state.prices[asset.symbol]); if (!known.length) return;
+    const signature = known.map(asset => { const change = numeric(state.prices[asset.symbol].change); return change > 0 ? '+' : change < 0 ? '-' : '0'; }).join('');
+    if (signature === state.lastRadarSignature) return;
+    state.lastRadarSignature = signature;
     const positives = known.filter(asset => numeric(state.prices[asset.symbol].change) > 0).length; const negatives = known.filter(asset => numeric(state.prices[asset.symbol].change) < 0).length;
     $('#radar-number').innerHTML = `${positives}<span> / ${known.length}</span>`; $('#radar-label').textContent = positives === known.length ? 'Alta general' : positives > negatives ? 'Viés positivo' : negatives > positives ? 'Viés negativo' : 'Mercado misto';
     $('#radar-desc').textContent = `${positives} em alta · ${negatives} em queda`;
@@ -284,13 +378,24 @@
   }
   function updateTickerDOMForTables(symbol) {
     const data = state.prices[symbol]; if (!data) return;
-    $$(`[data-change-cell="${symbol}"]`).forEach(el => { el.className = `table-change ${pctClass(data.change)}`; el.textContent = formatPct(data.change); });
-    $$(`[data-pulse-price="${symbol}"]`).forEach(el => { el.textContent = formatPrice(data.price); });
-    $$(`[data-pulse-change="${symbol}"]`).forEach(el => { el.className = `metric-change ${pctClass(data.change)}`; el.innerHTML = `${data.change > 0 ? '↗ ' : data.change < 0 ? '↘ ' : ''}${escapeHTML(formatPct(data.change))}`; });
-    $$(`[data-high-for="${symbol}"]`).forEach(el => { el.textContent = formatPrice(data.high); });
-    $$(`[data-low-for="${symbol}"]`).forEach(el => { el.textContent = formatPrice(data.low); });
-    $$(`[data-volume-for="${symbol}"]`).forEach(el => { el.textContent = formatVolume(data.volume); });
-    $('#table-updated').textContent = `Atualizado às ${new Date().toLocaleTimeString('pt-BR')}`;
+    const changeClass = `table-change ${pctClass(data.change)}`;
+    const changeText = formatPct(data.change);
+    $$(`[data-change-cell="${symbol}"]`).forEach(el => { if (el.className !== changeClass) el.className = changeClass; setTextIfChanged(el, changeText); });
+    $$(`[data-pulse-price="${symbol}"]`).forEach(el => setTextIfChanged(el, formatPrice(data.price)));
+    $$(`[data-pulse-change="${symbol}"]`).forEach(el => {
+      const className = `metric-change ${pctClass(data.change)}`;
+      const text = `${data.change > 0 ? '↗ ' : data.change < 0 ? '↘ ' : ''}${formatPct(data.change)}`;
+      if (el.className !== className) el.className = className;
+      setTextIfChanged(el, text);
+    });
+    $$(`[data-high-for="${symbol}"]`).forEach(el => setTextIfChanged(el, formatPrice(data.high)));
+    $$(`[data-low-for="${symbol}"]`).forEach(el => setTextIfChanged(el, formatPrice(data.low)));
+    $$(`[data-volume-for="${symbol}"]`).forEach(el => setTextIfChanged(el, formatVolume(data.volume)));
+    const now = Date.now();
+    if (now - state.lastTableUpdateAt >= 5000) {
+      setTextIfChanged($('#table-updated'), `Atualizado às ${new Date(now).toLocaleTimeString('pt-BR')}`);
+      state.lastTableUpdateAt = now;
+    }
   }
   const baseUpdateTickerDOM = updateTickerDOM;
   updateTickerDOM = function(symbol) { baseUpdateTickerDOM(symbol); updateTickerDOMForTables(symbol); };
@@ -318,7 +423,8 @@
       if (state.chart && state.candleSeries && state.volumeSeries) {
         $('#fallback-chart').hidden = true;
         state.candleSeries.setData(state.candles.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
-        state.volumeSeries.setData(state.candles.map(candle => ({ time: candle.time, value: candle.volume, color: candle.close >= candle.open ? 'rgba(24,246,163,.28)' : 'rgba(255,70,110,.28)' })));
+        const palette = chartPalette();
+        state.volumeSeries.setData(state.candles.map(candle => ({ time: candle.time, value: candle.volume, color: candle.close >= candle.open ? palette.upVolume : palette.downVolume })));
         state.chart.timeScale().fitContent();
       } else { drawFallbackChart(); }
       connectKlineSocket();
@@ -348,7 +454,7 @@
         else if (!previous || candle.time > previous.time) state.candles.push(candle);
         if (state.candles.length > 150) state.candles = state.candles.slice(-150);
         if (state.candleSeries) state.candleSeries.update({ time: candle.time, open: candle.open, high: candle.high, low: candle.low, close: candle.close });
-        if (state.volumeSeries) state.volumeSeries.update({ time: candle.time, value: candle.volume, color: candle.close >= candle.open ? 'rgba(24,246,163,.28)' : 'rgba(255,70,110,.28)' });
+        if (state.volumeSeries) { const palette = chartPalette(); state.volumeSeries.update({ time: candle.time, value: candle.volume, color: candle.close >= candle.open ? palette.upVolume : palette.downVolume }); }
         if (state.chartLibraryFailed) drawFallbackChart();
       } catch (error) { console.warn('Bad kline payload:', error); }
     };
@@ -360,16 +466,18 @@
     if (state.chartLibraryFailed) holder.innerHTML = '';
     canvas.hidden = false; canvas.style.display = 'block'; canvas.style.width = '100%'; canvas.style.height = '100%'; canvas.style.position = 'absolute'; canvas.style.inset = '0';
     const ctx = canvas.getContext('2d'); if (!ctx) return;
+    const palette = chartPalette();
     const width = holder.clientWidth || 600; const height = holder.clientHeight || 300; const dpr = Math.max(1, window.devicePixelRatio || 1);
     canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr); ctx.scale(dpr, dpr); ctx.clearRect(0,0,width,height);
     const data = state.candles.slice(-75); if (!data.length) return;
     const lo = Math.min(...data.map(d=>d.low)); const hi = Math.max(...data.map(d=>d.high)); const pad = (hi-lo)*.08 || hi*.01; const min=lo-pad, max=hi+pad;
     const left=8,right=66,top=16,bottom=26,volumeH=height*.17, chartBottom=height-bottom-volumeH, chartH=chartBottom-top, usableW=width-left-right, slot=usableW/data.length, candleW=Math.max(2,Math.min(9,slot*.64));
-    ctx.font='9px "DM Mono", monospace'; ctx.strokeStyle='rgba(129,151,191,.10)'; ctx.fillStyle='#73819a'; ctx.lineWidth=1;
+    const maxVolume = Math.max(1, ...data.map(d => d.volume));
+    ctx.font='9px "DM Mono", monospace'; ctx.strokeStyle=palette.grid; ctx.fillStyle=palette.text; ctx.lineWidth=1;
     for(let i=0;i<5;i++){const y=top+(chartH/4)*i;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(width-right+3,y);ctx.stroke();const value=max-(max-min)*i/4;ctx.fillText(formatPrice(value),width-right+8,y+3);}
     const yOf=value=>top+(max-value)/(max-min)*chartH;
-    data.forEach((candle,index)=>{const x=left+slot*index+slot/2;const up=candle.close>=candle.open;const color=up?'#18f6a3':'#ff466e';ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,yOf(candle.high));ctx.lineTo(x,yOf(candle.low));ctx.stroke();const y1=yOf(Math.max(candle.open,candle.close)),y2=yOf(Math.min(candle.open,candle.close));ctx.fillRect(x-candleW/2,y1,candleW,Math.max(1.3,y2-y1));const vh=(candle.volume/Math.max(...data.map(d=>d.volume)||[1]))*volumeH*.75;ctx.globalAlpha=.35;ctx.fillRect(x-candleW/2,chartBottom+volumeH-vh,candleW,vh);ctx.globalAlpha=1;});
-    ctx.fillStyle='#67758e';ctx.font='8px "DM Mono",monospace';const marks=[0,Math.floor(data.length*.33),Math.floor(data.length*.66),data.length-1];marks.forEach(index=>{const d=data[index];if(!d)return;const date=new Date(d.time*1000);const label=state.interval.endsWith('d')||state.interval==='1w'?`${date.getDate()}/${date.getMonth()+1}`:`${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;ctx.fillText(label,left+slot*index,height-6);});
+    data.forEach((candle,index)=>{const x=left+slot*index+slot/2;const up=candle.close>=candle.open;const color=up?palette.up:palette.down;ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,yOf(candle.high));ctx.lineTo(x,yOf(candle.low));ctx.stroke();const y1=yOf(Math.max(candle.open,candle.close)),y2=yOf(Math.min(candle.open,candle.close));ctx.fillRect(x-candleW/2,y1,candleW,Math.max(1.3,y2-y1));const vh=(candle.volume/maxVolume)*volumeH*.75;ctx.globalAlpha=.35;ctx.fillRect(x-candleW/2,chartBottom+volumeH-vh,candleW,vh);ctx.globalAlpha=1;});
+    ctx.fillStyle=palette.text;ctx.font='8px "DM Mono",monospace';const marks=[0,Math.floor(data.length*.33),Math.floor(data.length*.66),data.length-1];marks.forEach(index=>{const d=data[index];if(!d)return;const date=new Date(d.time*1000);const label=state.interval.endsWith('d')||state.interval==='1w'?`${date.getDate()}/${date.getMonth()+1}`:`${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;ctx.fillText(label,left+slot*index,height-6);});
   }
   function selectAsset(symbol) {
     if (!ASSETS.some(asset => asset.symbol === symbol)) return;
@@ -577,7 +685,7 @@
         height: '100%',
         locale: 'br',
         dateRange: '1D',
-        colorTheme: 'dark',
+        colorTheme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
         isTransparent: true,
         autosize: true,
         largeChartUrl: ''
@@ -632,6 +740,7 @@
     document.addEventListener('click', event => { const button = event.target.closest('[data-favorite]'); if (button) { event.preventDefault(); event.stopPropagation(); toggleFavorite(button.dataset.favorite); } });
     $('#refresh-news').addEventListener('click', () => loadNews({ manual: true }));
     $('#alerts-toggle').addEventListener('click', () => setBreakingEnabled(!state.breakingEnabled));
+    $('#theme-toggle').addEventListener('click', () => setTheme(state.theme === 'dark' ? 'light' : 'dark'));
     $('#sound-toggle').addEventListener('click', async () => {
       state.breakingSoundEnabled = !state.breakingSoundEnabled;
       writeJSON('kandle-breaking-sound-enabled', state.breakingSoundEnabled);
@@ -675,6 +784,7 @@
   function initLucide() { if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } }); }
   async function boot() {
     // KANDLE always opens on News, even if an old session left another page in the URL hash.
+    setTheme(state.theme, { persist: false });
     navigatePage('news', { scroll: false });
     if (location.hash && location.hash !== '#page-news') history.replaceState({ page: 'news' }, '', `${location.pathname}${location.search}#page-news`);
     initDateClock(); initLucide(); initEvents(); updateSoundToggle();

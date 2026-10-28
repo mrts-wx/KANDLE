@@ -1,6 +1,6 @@
 # KANDLE — Market Intelligence
 
-Terminal responsivo para acompanhar criptoativos, candles, notícias financeiras, breaking news e uma watchlist. Esta edição mantém a identidade **Obsidian Glass & Liquid Bevel**, navegação separada por páginas, favoritos neon e a vinheta sonora original do Breaking News. A KANDLE AI continua em modo de aviso de lançamento e não faz chamadas de inferência.
+Terminal responsivo para acompanhar criptoativos, candles, notícias financeiras, breaking news e uma watchlist. A v1.5 prioriza **fluidez, legibilidade e aparência de web app**, com tema Branco/Porcelana e tema Cinza-Chumbo selecionáveis, superfícies glass leves, navegação separada por páginas e a vinheta original do Breaking News. A KANDLE AI continua em modo de aviso de lançamento e não faz chamadas de inferência.
 
 ## Correção importante de deploy — `Asset too large`
 
@@ -21,7 +21,7 @@ O problema era configurar a raiz do repositório (`.`) como pasta de assets est�
 .
 ├── public/
 │   ├── index.html       # interface do site
-│   ├── styles.css       # visual Liquid Glass e responsividade
+│   ├── styles.css       # temas, superfícies glass leves, contraste e responsividade
 │   ├── app.js           # cotações, candles, navegação e breaking news
 │   ├── ai.js            # popup de IA em modo de desenvolvimento
 │   └── 404.html         # página de não encontrado
@@ -81,6 +81,8 @@ O nome configurado do Worker é `kandle`. Altere `name` em `wrangler.jsonc` caso
 - Notícias agregadas por servidor, com status por fonte.
 - Breaking News global com vinheta original criada via Web Audio API; o som não reproduz a assinatura sonora da CNN.
 - Preferência de som salva no navegador e teste de alerta.
+- Temas Branco/Porcelana e Cinza-Chumbo, com preferência salva e gráficos adaptados ao tema.
+- Renderização dos ticks agrupada em lotes, sem reflow síncrono forçado, com menos mutações e animações contínuas para melhorar a fluidez.
 - Páginas independentes Notícias (inicial), Mercados e Watchlist.
 - Favoritos com bookmark preenchido em verde neon.
 - Widgets TradingView; referências alternativas para Nasdaq/Dow podem divergir dos símbolos oficiais, conforme indicado na interface.
@@ -93,3 +95,14 @@ Confirme que o erro novo não está apontando para `node_modules/workerd`. No `w
 ## Limitações
 
 Cotações, feeds e widgets dependem de serviços externos e podem sofrer indisponibilidade. O painel é informativo; ele não envia ordens nem conecta carteiras e não é recomendação financeira individual.
+
+
+## KANDLE v1.5 — Fluid App
+
+- Tema alternável entre **Branco** e **Cinza-chumbo** pelo botão de sol/lua no topo; a preferência fica salva no navegador.
+- Otimização de fluidez: cotações via WebSocket são agrupadas antes de atualizar a interface, retirado o reflow forçado dos flashes de preço, Market Pulse só redesenha quando a direção dos ativos muda e o gráfico fallback calcula o volume máximo apenas uma vez por desenho.
+- Liquid Glass mais leve: superfícies opacas/translúcidas com bordas refletivas e sombras mais discretas; removidos blur e glow contínuos caros e reduzidas animações permanentes.
+- Cores do gráfico e widgets TradingView acompanham o tema selecionado.
+- Respeito a `prefers-reduced-motion`. O KANDLE Breaking Sound, o Worker e os arquivos de deploy foram mantidos.
+
+O deploy continua seguindo `wrangler.jsonc`: os arquivos estáticos devem ser servidos exclusivamente pela pasta `public/`.
