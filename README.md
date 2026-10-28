@@ -117,8 +117,13 @@ O deploy continua seguindo `wrangler.jsonc`: os arquivos estáticos devem ser se
 
 Para atualizar, substitua os arquivos de `public/` deste pacote na raiz do seu repositório e publique normalmente com o `wrangler.jsonc` já existente.
 
-## Atualização v1.5.2
+## Atualização v1.6.0
 
 Esta versão melhora o tema dos widgets do TradingView (eles são reconstruídos com tema, fundo e cores de texto explícitos ao alternar entre claro e escuro), fixa a área de trabalho na página Notícias para que somente o feed role e amplia os feeds editoriais para política e economia do Brasil e do cenário global. A rota de notícias agrega sete feeds, incluindo buscas do Google News para política/economia e feeds separados de cripto.
 
 Após o deploy, confira `https://SEU-DOMINIO/api/news`: `items` deve conter manchetes com `category` igual a `brasil`, `crypto` ou `global`; `sources` mostra quais fontes responderam.
+
+
+## KANDLE v1.6.0 — visual neutro e polimento
+
+Esta versão remove o botão de teste público de Breaking News, adota uma interface mais minimalista com temas claro e cinza-chumbo de alto contraste, reduz efeitos caros de composição e melhora os detalhes responsivos. O som original de Breaking News e os alertas automáticos reais permanecem. Consulte `CHANGELOG-v1.6.0.md` para o resumo completo.

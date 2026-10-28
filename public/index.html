@@ -3,9 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101216">
+  <meta name="theme-color" content="#171a1f">
   <script>try{const kandleTheme=JSON.parse(localStorage.getItem("kandle-theme")||"\"dark\"");document.documentElement.dataset.theme=kandleTheme==="light"?"light":"dark"}catch{document.documentElement.dataset.theme="dark"}</script>
   <meta name="description" content="KANDLE — notícias de política, economia, mercados globais e criptoativos em tempo real.">
+  <meta name="application-name" content="KANDLE">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="KANDLE">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>KANDLE — Market Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,7 +40,7 @@
         <div class="connection-line"><span></span></div>
         <p>Dados públicos de mercado · sem execução de ordens</p>
       </section>
-      <div class="sidebar-footer"><span class="footer-orb"></span><span>BUILT FOR THE CURIOUS</span><span class="version">v1.5.2</span></div>
+      <div class="sidebar-footer"><span class="footer-orb"></span><span>BUILT FOR THE CURIOUS</span><span class="version">v1.6.0</span></div>
     </aside>
 
     <main class="main-content" id="main-content">
@@ -47,7 +51,7 @@
           <button id="theme-toggle" class="icon-action theme-toggle" type="button" title="Mudar para tema claro" aria-label="Mudar para tema claro" aria-pressed="false"><i data-lucide="sun"></i></button>
           <button id="sound-toggle" class="icon-action sound-active" type="button" title="Som de breaking news ativado" aria-label="Desativar som de breaking news" aria-pressed="true"><i data-lucide="volume-2"></i></button>
           <button id="alerts-toggle" class="icon-action alerts-active" type="button" title="Ativar ou pausar alertas de breaking news" aria-pressed="true"><i data-lucide="bell-ring"></i><span class="alert-pip"></span></button>
-          <button id="test-alert" class="button button-ghost test-alert" type="button"><i data-lucide="zap"></i> Testar alerta</button>
+          
           <div class="avatar">K<span></span></div>
         </div>
       </header>

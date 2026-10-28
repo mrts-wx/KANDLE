@@ -186,7 +186,7 @@
     document.documentElement.dataset.theme = state.theme;
     document.documentElement.style.colorScheme = state.theme === 'light' ? 'light' : 'dark';
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', state.theme === 'light' ? '#e8edf3' : '#101216');
+    if (meta) meta.setAttribute('content', state.theme === 'light' ? '#F3F4F6' : '#171A1F');
     const button = $('#theme-toggle');
     if (button) {
       const light = state.theme === 'light';
@@ -656,23 +656,22 @@
     const item = state.breakingQueue.shift(); showBreaking(item);
   }
   function showBreaking(item) {
-    if (!state.breakingEnabled && !item.demo) return;
+    if (!state.breakingEnabled) return;
     state.breakingActive = true;
     playBreakingSting();
     const overlay = $('#breaking-overlay'); const host = $('#breaking-content'); overlay.classList.add('active'); overlay.setAttribute('aria-hidden','false'); document.body.style.overflow = 'hidden';
     host.innerHTML = `<div class="breaking-intro"><div class="breaking-label"><i></i> KANDLE ALERT SYSTEM · LIVE</div><h2>BREAKING<span>NEWS</span></h2><p>EVENTO RELEVANTE DETECTADO · PREPARANDO RESUMO</p><div class="breaking-progress"><span></span></div></div>`;
     clearBreakingTimers();
     state.breakingTimers.push(setTimeout(() => {
-      const source = item.demo ? 'KANDLE SYSTEM · SIMULAÇÃO' : `${item.source} · ${formatNewsTime(item.published)}`;
-      host.innerHTML = `<article class="breaking-story"><div class="breaking-label"><i></i> ${item.demo ? 'TESTE VISUAL DO ALERTA' : 'ALERTA DE MERCADO DETECTADO'}</div><div class="story-source">${escapeHTML(source.toUpperCase())}</div><h2 id="breaking-title">${escapeHTML(item.title)}</h2><p>${escapeHTML(item.description || 'Uma nova manchete relevante foi detectada pelas fontes monitoradas. Abra a matéria para consultar os detalhes e o contexto.')}</p><div class="story-rule"></div><div class="story-actions">${item.url ? `<a href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i> Ler matéria completa</a>` : ''}<button type="button" id="close-breaking"><i data-lucide="check"></i> Continuar monitorando</button></div><div class="story-foot">KANDLE · ALERTA AUTOMÁTICO DE MANCHETES · NÃO É RECOMENDAÇÃO FINANCEIRA</div></article>`;
+      const source = `${item.source} · ${formatNewsTime(item.published)}`;
+      host.innerHTML = `<article class="breaking-story"><div class="breaking-label"><i></i> ALERTA DE MERCADO DETECTADO</div><div class="story-source">${escapeHTML(source.toUpperCase())}</div><h2 id="breaking-title">${escapeHTML(item.title)}</h2><p>${escapeHTML(item.description || 'Uma nova manchete relevante foi detectada pelas fontes monitoradas. Abra a matéria para consultar os detalhes e o contexto.')}</p><div class="story-rule"></div><div class="story-actions">${item.url ? `<a href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i> Ler matéria completa</a>` : ''}<button type="button" id="close-breaking"><i data-lucide="check"></i> Continuar monitorando</button></div><div class="story-foot">KANDLE · ALERTA AUTOMÁTICO DE MANCHETES · NÃO É RECOMENDAÇÃO FINANCEIRA</div></article>`;
       if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
       $('#close-breaking')?.addEventListener('click', closeBreaking);
-    }, item.demo ? 1900 : 2650));
-    if (item.demo) { $('#breaking-overlay').dataset.demo = 'true'; } else { delete $('#breaking-overlay').dataset.demo; }
+    }, 2650));
   }
   function clearBreakingTimers() { state.breakingTimers.forEach(timer => clearTimeout(timer)); state.breakingTimers = []; }
   function closeBreaking() {
-    clearBreakingTimers(); const overlay = $('#breaking-overlay'); overlay.classList.remove('active'); overlay.setAttribute('aria-hidden','true'); document.body.style.overflow = ''; $('#breaking-content').innerHTML = ''; state.breakingActive = false; delete overlay.dataset.demo;
+    clearBreakingTimers(); const overlay = $('#breaking-overlay'); overlay.classList.remove('active'); overlay.setAttribute('aria-hidden','true'); document.body.style.overflow = ''; $('#breaking-content').innerHTML = ''; state.breakingActive = false;
     if (state.breakingEnabled && state.breakingQueue.length) setTimeout(showNextBreaking, 600);
   }
   function toggleFavorite(symbol) {
@@ -682,7 +681,7 @@
   }
   function setBreakingEnabled(enabled) {
     state.breakingEnabled = enabled; writeJSON('kandle-breaking-enabled', enabled); const btn = $('#alerts-toggle'); btn.classList.toggle('alerts-active', enabled); btn.classList.toggle('alerts-paused', !enabled); btn.setAttribute('aria-pressed', String(enabled)); btn.title = enabled ? 'Alertas de breaking news ativos' : 'Alertas de breaking news pausados';
-    if (!enabled) { state.breakingQueue = []; if (state.breakingActive && !$('#breaking-overlay').dataset.demo) closeBreaking(); }
+    if (!enabled) { state.breakingQueue = []; if (state.breakingActive) closeBreaking(); }
     toast(enabled ? 'Alertas ativados' : 'Alertas pausados', enabled ? 'Novas manchetes relevantes poderão abrir o modo breaking news.' : 'O feed continua atualizando sem abrir a animação de tela cheia.');
   }
   function showMacroFallback(container, message = 'Abra este instrumento diretamente no TradingView.') {
@@ -817,10 +816,7 @@
     };
     document.addEventListener('pointerdown', unlockOnFirstGesture, true);
     document.addEventListener('keydown', unlockOnFirstGesture, true);
-    $('#test-alert').addEventListener('click', async () => {
-      if (state.breakingSoundEnabled) await unlockBreakingAudio();
-      showBreaking({ demo: true, title: 'Este é um teste do sistema de Breaking News', description: 'Quando uma manchete nova e potencialmente relevante for detectada nas fontes de notícias, o KANDLE abre esta animação em tela cheia e apresenta a manchete e seu resumo. O feed continua sendo atualizado automaticamente em segundo plano.', source: 'KANDLE TERMINAL', url: '' });
-    });
+
     $$('[data-page-link]').forEach(link => link.addEventListener('click', event => {
       event.preventDefault();
       const page = link.dataset.pageLink;
@@ -829,7 +825,7 @@
     }));
     window.addEventListener('popstate', () => navigatePage(pageFromHash(), { scroll: true }));
     window.addEventListener('hashchange', () => navigatePage(pageFromHash(), { scroll: true }));
-    $('#breaking-overlay').addEventListener('click', event => { if (event.target.id === 'breaking-overlay' && $('#breaking-overlay').dataset.demo === 'true') closeBreaking(); });
+    $('#breaking-overlay').addEventListener('click', event => { if (event.target.id === 'breaking-overlay') closeBreaking(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && state.breakingActive) closeBreaking(); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (!state.tickerSocket || state.tickerSocket.readyState > 1) connectTickerSocket(); } });
   }
